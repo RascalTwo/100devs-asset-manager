@@ -23,7 +23,7 @@ const parseLinks = makeParser<Record<'Twitch' | 'YouTube', string>>(absolute =>
   ),
 );
 
-const parseChapters = makeParser<SecondsMap>(absolute =>
+export const parseChapters = makeParser<SecondsMap>(absolute =>
   readFileString(absolute).then(text =>
     text
       .trim()
@@ -37,7 +37,7 @@ const parseChapters = makeParser<SecondsMap>(absolute =>
   ),
 );
 
-const parseCaptions = makeParser<SecondsMap>(absolute => {
+export const parseCaptions = makeParser<SecondsMap>(absolute => {
   const minuteCaptions = fs.readdirSync(absolute).find(filename => filename.endsWith('.txt'));
   if (!minuteCaptions) return Promise.resolve(null);
   return readFileString(path.join(absolute, minuteCaptions))
@@ -69,7 +69,7 @@ const parseCaptions = makeParser<SecondsMap>(absolute => {
     });
 });
 
-const parseChat = makeParser<ChatInfo>(absolute =>
+export const parseChat = makeParser<ChatInfo>(absolute =>
   readFileString(absolute)
     .then(JSON.parse)
     .then(messages =>
@@ -96,29 +96,24 @@ interface ChatMessage {
   body: string;
 }
 
-interface ClassInfo {
+export interface ClassInfo {
   dirname: string;
   date: Date;
   absolute: string;
   links: null | Record<'Twitch' | 'YouTube', string>;
-  chapters: null | SecondsMap;
-  captions: null | SecondsMap;
-  chat: null | ChatInfo;
+  chapters?: null | SecondsMap;
+  captions?: null | SecondsMap;
+  chat?: null | ChatInfo;
   isOfficeHours: boolean;
 }
 
-const root = path.join(path.dirname(__filename), '..');
 const fetchClasses = (): Promise<ClassInfo[]> =>
   Promise.all(
     fs
-      .readdirSync(root)
+      .readdirSync('..')
       .filter(dirname => dirname.match(/\d{4}(-\d{2}){2}/))
       .map(async dirname => {
-        const absolute = path.join(root, dirname);
-        const links = await parseLinks(path.join(absolute, 'links'));
-        const chapters = await parseChapters(path.join(absolute, 'chapters'));
-        const captions = await parseCaptions(path.join(absolute, 'captions'));
-        const chat = await parseChat(path.join(absolute, 'chat.json'));
+        const absolute = path.join('..', dirname);
 
         const [year, month, dayOfMonth] = dirname.split('-').map(Number);
         const date = new Date(year, month - 1, dayOfMonth);
@@ -127,25 +122,11 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
           dirname,
           date,
           absolute,
-          links,
-          chapters,
-          captions,
-          chat,
+          links: await parseLinks(path.join(absolute, 'links')),
           isOfficeHours: date.getDay() === 0,
         };
       }),
   );
-
-function* getWhatsMissing(info: ClassInfo) {
-  if (!info.chat) yield 'chat.json';
-  if (!info.links) yield 'links';
-  if (!info.chapters) yield 'chapters';
-  if (!info.isOfficeHours) {
-    if (!info.captions) yield 'captions';
-    if (info.links && !info.links.YouTube) yield 'YouTube link';
-  }
-  if (info.links && !info.links.Twitch) yield 'Twitch link';
-}
 
 const searchSecondsMapForNeedle = (
   obj: SecondsMap,
@@ -182,116 +163,134 @@ const matchesToAbbr = (matches: Record<'chapters' | 'captions' | 'links' | 'chat
   return '(' + parts.join(', ') + ')';
 };
 
-fetchClasses().then(classes => {
-  console.log(
-    classes
-      .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
-      .filter(([_, missing]) => missing.length)
-      .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`)
-      .join('\n'),
-  );
-  return inquirer
-    .prompt([
-      {
-        name: 'query',
-        message: 'Text to search for',
-        validate: text => !!text.trim().length,
-      },
-      {
-        type: 'checkbox',
-        name: 'haystackNames',
-        message: 'Assets to search within',
-        choices: ['chapters', 'links', 'captions', 'chat'],
-        default: ['chapters', 'links'],
-      },
-      {
-        type: 'confirm',
-        name: 'caseInsensitive',
-        message: 'Case insensitive?',
-        default: true,
-      },
-    ])
-    .then(
-      async ({
-        caseInsensitive,
-        query,
-        haystackNames,
-      }: {
-        caseInsensitive: boolean;
-        query: string;
-        haystackNames: string[];
-      }) => {
-        const haystacks = haystackNames.reduce<Record<'chapters' | 'captions' | 'links' | 'chat', true>>(
-          (stack, name) => ({ ...stack, [name]: true }),
-          {} as any,
-        );
+if (require.main === module)
+  fetchClasses().then(classes => {
+    return inquirer
+      .prompt([
+        {
+          name: 'query',
+          message: 'Text to search for',
+          validate: text => !!text.trim().length,
+        },
+        {
+          type: 'checkbox',
+          name: 'haystackNames',
+          message: 'Assets to search within',
+          choices: ['chapters', 'links', 'captions', 'chat'],
+          default: ['chapters', 'links'],
+        },
+        {
+          type: 'confirm',
+          name: 'caseInsensitive',
+          message: 'Case insensitive?',
+          default: true,
+        },
+      ])
+      .then(
+        async ({
+          caseInsensitive,
+          query,
+          haystackNames,
+        }: {
+          caseInsensitive: boolean;
+          query: string;
+          haystackNames: string[];
+        }) => {
+          const haystacks = haystackNames.reduce<Record<'chapters' | 'captions' | 'links' | 'chat', true>>(
+            (stack, name) => ({ ...stack, [name]: true }),
+            {} as any,
+          );
 
-        if (caseInsensitive) query = query.toLowerCase();
-        const includes = includesGenerator(caseInsensitive);
+          if (caseInsensitive) query = query.toLowerCase();
+          const includes = includesGenerator(caseInsensitive);
 
-        const classMatches = classes
-          .map(info => {
-            const matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
-              chapters: [],
-              captions: [],
-              links: [],
-              chat: [],
-              raw: [],
-            };
-            if (includes(info.dirname, query)) matches.raw.push(info.dirname);
-            if (info.chapters && haystacks.chapters)
-              matches.chapters = secondsMapToLines(info, searchSecondsMapForNeedle(info.chapters, query, includes));
-            if (info.captions && haystacks.captions)
-              matches.captions = secondsMapToLines(info, searchSecondsMapForNeedle(info.captions, query, includes));
-            if (info.chat && haystacks.chat)
-              matches.chat = secondsMapToLines(
-                info,
-                searchSecondsMapForNeedle(chatToSecondsMap(info.chat), query, includes),
+          const classMatches = (
+            await Promise.all(
+              classes.map(async info => {
+                const matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
+                  chapters: [],
+                  captions: [],
+                  links: [],
+                  chat: [],
+                  raw: [],
+                };
+                if (includes(info.dirname, query)) matches.raw.push(info.dirname);
+                if (haystacks.chapters) {
+                  if (info.chapters === undefined)
+                    info.chapters = await parseChapters(path.join(info.absolute, 'chapters'));
+                  if (info.chapters)
+                    matches.chapters = secondsMapToLines(
+                      info,
+                      searchSecondsMapForNeedle(info.chapters, query, includes),
+                    );
+                }
+                if (haystacks.captions) {
+                  if (info.captions === undefined)
+                    info.captions = await parseCaptions(path.join(info.absolute, 'captions'));
+                  if (info.captions)
+                    matches.captions = secondsMapToLines(
+                      info,
+                      searchSecondsMapForNeedle(info.captions, query, includes),
+                    );
+                }
+                if (haystacks.chat) {
+                  if (info.chat === undefined) info.chat = await parseChat(path.join(info.absolute, 'chat.json'));
+                  if (info.chat)
+                    matches.chat = secondsMapToLines(
+                      info,
+                      searchSecondsMapForNeedle(chatToSecondsMap(info.chat), query, includes),
+                    );
+                }
+                if (info.links && haystacks.links)
+                  matches.links = Object.entries(info.links)
+                    .filter(parts => parts.some(part => includes(part, query)))
+                    .map(parts => parts.join(': '));
+                return [info, matches] as [
+                  ClassInfo,
+                  Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>,
+                ];
+              }),
+            )
+          ).filter(([_, matches]) => Object.values(matches).some(m => m.length));
+          if (!classMatches.length) console.log('No matches found');
+
+          while (true) {
+            const chosenClasses =
+              classMatches.length === 1
+                ? classMatches
+                : await inquirer
+                    .prompt([
+                      {
+                        type: 'checkbox',
+                        name: 'chosen',
+                        message: 'Class(es) to view matches of',
+                        choices: classMatches.map(([info, matches], i) => ({
+                          name: `${info.dirname} - ${matchesToAbbr(matches)}`,
+                          value: i,
+                        })),
+                        loop: false,
+                      },
+                    ])
+                    .then(({ chosen }: { chosen: number[] }) => classMatches.filter((_, i) => chosen.includes(i)));
+            if (!chosenClasses.length) break;
+
+            for (const [info, matches] of chosenClasses) {
+              console.log(
+                `${info.dirname} with ${matchesToAbbr(matches)} matches:\n${
+                  info.links ? (info.links.Twitch || info.links.YouTube) + '\n' : ''
+                }`,
               );
-            if (info.links && haystacks.links)
-              matches.links = Object.entries(info.links)
-                .filter(parts => parts.some(part => includes(part, query)))
-                .map(parts => parts.join(': '));
-            return [info, matches] as [ClassInfo, Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>];
-          })
-          .filter(([_, matches]) => Object.values(matches).some(m => m.length));
-        if (!classMatches.length) console.log('No matches found');
-
-        while (true) {
-          const chosenClasses =
-            classMatches.length === 1
-              ? classMatches
-              : await inquirer
-                  .prompt([
-                    {
-                      type: 'checkbox',
-                      name: 'chosen',
-                      message: 'Class(es) to view matches of',
-                      choices: classMatches.map(([info, matches], i) => ({
-                        name: `${info.dirname} - ${matchesToAbbr(matches)}`,
-                        value: i,
-                      })),
-                      loop: false,
-                    },
-                  ])
-                  .then(({ chosen }: { chosen: number[] }) => classMatches.filter((_, i) => chosen.includes(i)));
-          if (!chosenClasses.length) break;
-
-          for (const [info, matches] of chosenClasses) {
-            console.log(
-              `${info.dirname} with ${matchesToAbbr(matches)} matches:\n${
-                info.links ? (info.links.Twitch || info.links.YouTube) + '\n' : ''
-              }`,
-            );
-            for (const [haystack, lines] of Object.entries(matches)) {
-              if (!lines.length) continue;
-              console.log('\t' + haystack.toUpperCase());
-              console.log(lines.join('\n'));
+              for (const [haystack, lines] of Object.entries(matches)) {
+                if (!lines.length) continue;
+                console.log('\t' + haystack.toUpperCase());
+                console.log(lines.join('\n'));
+              }
             }
-          }
 
-          if (classMatches.length === 1) break;
-        }
-      },
-    );
-});
+            if (classMatches.length === 1) break;
+          }
+        },
+      );
+  });
+
+export { fetchClasses };

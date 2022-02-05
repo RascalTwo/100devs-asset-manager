@@ -172,6 +172,16 @@ const chatToSecondsMap = (chatInfo: ChatInfo) => {
 const includesGenerator = (caseInsensitive: boolean) => (haystack: string, needle: string) =>
   caseInsensitive ? haystack.toLowerCase().includes(needle) : haystack.includes(needle);
 
+const matchesToAbbr = (matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>) => {
+  const parts = [];
+  if (matches.chapters.length) parts.push('ch:' + matches.chapters.length);
+  if (matches.captions.length) parts.push('cap:' + matches.captions.length);
+  if (matches.links.length) parts.push('lnk:' + matches.links.length);
+  if (matches.chat.length) parts.push('ct:' + matches.chat.length);
+  if (matches.raw.length) parts.push('raw:' + matches.chapters.length);
+  return '(' + parts.join(', ') + ')';
+};
+
 fetchClasses().then(classes => {
   console.log(
     classes
@@ -202,7 +212,7 @@ fetchClasses().then(classes => {
       },
     ])
     .then(
-      ({
+      async ({
         caseInsensitive,
         query,
         haystackNames,
@@ -221,33 +231,66 @@ fetchClasses().then(classes => {
 
         const classMatches = classes
           .map(info => {
-            const matches = [];
-            if (includes(info.dirname, query)) matches.push(info.dirname);
+            const matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
+              chapters: [],
+              captions: [],
+              links: [],
+              chat: [],
+              raw: [],
+            };
+            if (includes(info.dirname, query)) matches.raw.push(info.dirname);
             if (info.chapters && haystacks.chapters)
-              matches.push(...secondsMapToLines(info, searchSecondsMapForNeedle(info.chapters, query, includes)));
+              matches.chapters = secondsMapToLines(info, searchSecondsMapForNeedle(info.chapters, query, includes));
             if (info.captions && haystacks.captions)
-              matches.push(...secondsMapToLines(info, searchSecondsMapForNeedle(info.captions, query, includes)));
+              matches.captions = secondsMapToLines(info, searchSecondsMapForNeedle(info.captions, query, includes));
             if (info.chat && haystacks.chat)
-              matches.push(
-                ...secondsMapToLines(info, searchSecondsMapForNeedle(chatToSecondsMap(info.chat), query, includes)),
+              matches.chat = secondsMapToLines(
+                info,
+                searchSecondsMapForNeedle(chatToSecondsMap(info.chat), query, includes),
               );
             if (info.links && haystacks.links)
-              matches.push(
-                ...Object.entries(info.links)
-                  .filter(parts => parts.some(part => includes(part, query)))
-                  .map(parts => parts.join(': ')),
-              );
-            return [info, matches] as [ClassInfo, string[]];
+              matches.links = Object.entries(info.links)
+                .filter(parts => parts.some(part => includes(part, query)))
+                .map(parts => parts.join(': '));
+            return [info, matches] as [ClassInfo, Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>];
           })
-          .filter(([_, matches]) => matches.length);
+          .filter(([_, matches]) => Object.values(matches).some(m => m.length));
         if (!classMatches.length) console.log('No matches found');
-        for (const [info, matches] of classMatches) {
-          console.log(
-            `${info.dirname} with ${matches.length} matches:\n${
-              info.links ? (info.links.Twitch || info.links.YouTube) + '\n' : ''
-            }`,
-          );
-          console.log(matches.join('\n'));
+
+        while (true) {
+          const chosenClasses =
+            classMatches.length === 1
+              ? classMatches
+              : await inquirer
+                  .prompt([
+                    {
+                      type: 'checkbox',
+                      name: 'chosen',
+                      message: 'Class(es) to view matches of',
+                      choices: classMatches.map(([info, matches], i) => ({
+                        name: `${info.dirname} - ${matchesToAbbr(matches)}`,
+                        value: i,
+                      })),
+                      loop: false,
+                    },
+                  ])
+                  .then(({ chosen }: { chosen: number[] }) => classMatches.filter((_, i) => chosen.includes(i)));
+          if (!chosenClasses.length) break;
+
+          for (const [info, matches] of chosenClasses) {
+            console.log(
+              `${info.dirname} with ${matchesToAbbr(matches)} matches:\n${
+                info.links ? (info.links.Twitch || info.links.YouTube) + '\n' : ''
+              }`,
+            );
+            for (const [haystack, lines] of Object.entries(matches)) {
+              if (!lines.length) continue;
+              console.log('\t' + haystack.toUpperCase());
+              console.log(lines.join('\n'));
+            }
+          }
+
+          if (classMatches.length === 1) break;
         }
       },
     );

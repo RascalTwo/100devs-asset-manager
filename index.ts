@@ -119,10 +119,10 @@ const getMissingStrings = (classes: ClassInfo[]) => {
     if (info.links && !info.links.Twitch) yield 'Twitch link';
   }
   return classes
-      .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
-      .filter(([_, missing]) => missing.length)
-      .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`)
-}
+    .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
+    .filter(([_, missing]) => missing.length)
+    .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`);
+};
 
 const fetchClasses = (): Promise<ClassInfo[]> =>
   Promise.all(
@@ -153,9 +153,45 @@ const searchSecondsMapForNeedle = (
   return new Map([...obj.entries()].filter(([_, haystack]) => includes(haystack, needle)));
 };
 
+/**
+ * Convert seconds to DHMS
+ *
+ * @param {number} seconds
+ * @returns {string}
+ */
+export function secondsToDHMS(seconds: number, minimalPlaces = 1) {
+  // TODO - fix this rushed math
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds - days * 86400) / 3600);
+  const minutes = Math.floor((seconds % (60 * 60)) / 60);
+  const parts = [days, hours, minutes, Math.floor(seconds % 60)];
+  while (!parts[0] && parts.length > minimalPlaces) parts.shift();
+  return parts.map(num => num.toString().padStart(2, '0')).join(':');
+}
+
+export function generateTwitchTimestamp(seconds: number, minimalPlaces: number = 1) {
+  const symbols = ['d', 'h', 'm'];
+  const dhms = Array.from(secondsToDHMS(seconds, minimalPlaces));
+
+  // 0:1:2:3 -> 0:1:2m3 -> 0:1h2m3 -> 0d1h2m3
+  while (true) {
+    const index = dhms.lastIndexOf(':');
+    if (index === -1) break;
+    dhms[index] = symbols.pop()!;
+  }
+
+  return dhms.join('') + 's';
+}
+
 const secondsMapToLines = (info: ClassInfo, map: SecondsMap) => {
+  const entries = [...map.entries()].reverse();
+  if (!entries.length) return [];
+
   let prefix = (info.links!.Twitch || info.links!.YouTube) + '?t=';
-  return [...map.entries()].map(([seconds, haystack]) => `${prefix + seconds}\t${haystack}`);
+  const places = secondsToDHMS(entries[0][0]).split(':').length;
+  return entries
+    .reverse()
+    .map(([seconds, haystack]) => `${prefix + generateTwitchTimestamp(seconds, places)}\t${haystack}`);
 };
 
 const chatToSecondsMap = (chatInfo: ChatInfo) => {

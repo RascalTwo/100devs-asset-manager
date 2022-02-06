@@ -218,7 +218,7 @@ const matchesToAbbr = (matches: Record<'chapters' | 'captions' | 'links' | 'chat
 
 if (require.main === module)
   fetchClasses().then(classes => {
-    console.log(getMissingStrings(classes).join('\n'))
+    console.log(getMissingStrings(classes).join('\n'));
     return inquirer
       .prompt([
         {

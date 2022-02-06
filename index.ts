@@ -107,6 +107,23 @@ export interface ClassInfo {
   isOfficeHours: boolean;
 }
 
+const getMissingStrings = (classes: ClassInfo[]) => {
+  function* getWhatsMissing(info: ClassInfo) {
+    if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
+    if (!info.links) yield 'links';
+    if (!fs.existsSync(path.join(info.absolute, 'chapters'))) yield 'chapters';
+    if (!info.isOfficeHours) {
+      if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
+      if (info.links && !info.links.YouTube) yield 'YouTube link';
+    }
+    if (info.links && !info.links.Twitch) yield 'Twitch link';
+  }
+  return classes
+      .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
+      .filter(([_, missing]) => missing.length)
+      .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`)
+}
+
 const fetchClasses = (): Promise<ClassInfo[]> =>
   Promise.all(
     fs
@@ -165,6 +182,7 @@ const matchesToAbbr = (matches: Record<'chapters' | 'captions' | 'links' | 'chat
 
 if (require.main === module)
   fetchClasses().then(classes => {
+    console.log(getMissingStrings(classes).join('\n'))
     return inquirer
       .prompt([
         {
@@ -252,7 +270,7 @@ if (require.main === module)
               }),
             )
           ).filter(([_, matches]) => Object.values(matches).some(m => m.length));
-          if (!classMatches.length) console.log('No matches found');
+          if (!classMatches.length) return console.log('No matches found');
 
           while (true) {
             const chosenClasses =

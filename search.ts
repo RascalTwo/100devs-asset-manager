@@ -190,11 +190,11 @@ export function generateTwitchTimestamp(seconds: number, minimalPlaces: number =
   return dhms.join('') + 's';
 }
 
-const secondsMapToLines = (info: ClassInfo, map: SecondsMap) => {
+const secondsMapToLines = (url: string, map: SecondsMap) => {
   const entries = [...map.entries()].reverse();
   if (!entries.length) return [];
 
-  let prefix = (info.links!.Twitch || info.links!.YouTube) + '?t=';
+  let prefix = url + '?t=';
   const places = secondsToDHMS(entries[0][0]).split(':').length;
   return entries
     .reverse()
@@ -268,6 +268,8 @@ if (require.main === module)
           const classMatches = (
             await Promise.all(
               classes.map(async info => {
+                const url = info.links!.Twitch || info.links!.YouTube;
+
                 const matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
                   markers: [],
                   captions: [],
@@ -280,17 +282,14 @@ if (require.main === module)
                   if (info.markers === undefined)
                     info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
                   if (info.markers)
-                    matches.markers = secondsMapToLines(
-                      info,
-                      searchSecondsMapForNeedle(info.markers, query, includes),
-                    );
+                    matches.markers = secondsMapToLines(url, searchSecondsMapForNeedle(info.markers, query, includes));
                 }
                 if (haystacks.captions) {
                   if (info.captions === undefined)
                     info.captions = await parseCaptions(path.join(info.absolute, 'captions'));
                   if (info.captions)
                     matches.captions = secondsMapToLines(
-                      info,
+                      url,
                       searchSecondsMapForNeedle(info.captions, query, includes),
                     );
                 }
@@ -298,7 +297,7 @@ if (require.main === module)
                   if (info.chat === undefined) info.chat = await parseChat(path.join(info.absolute, 'chat.json'));
                   if (info.chat)
                     matches.chat = secondsMapToLines(
-                      info,
+                      url,
                       searchSecondsMapForNeedle(chatToSecondsMap(info.chat), query, includes),
                     );
                 }

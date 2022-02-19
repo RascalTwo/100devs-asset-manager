@@ -11,7 +11,7 @@ const makeParser =
 
 const readFileString = (path: string) => fs.promises.readFile(path).then(b => b.toString());
 
-type SecondsMap = Map<number, string>;
+export type SecondsMap = Map<number, string>;
 
 const parseLinks = makeParser<Record<'Twitch' | 'YouTube', string>>(absolute =>
   readFileString(absolute).then(text =>

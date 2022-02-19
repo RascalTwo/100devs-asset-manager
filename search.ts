@@ -23,7 +23,7 @@ const parseLinks = makeParser<Record<'Twitch' | 'YouTube', string>>(absolute =>
   ),
 );
 
-export const parseChapters = makeParser<SecondsMap>(absolute =>
+export const parseMarkers = makeParser<SecondsMap>(absolute =>
   readFileString(absolute).then(text =>
     text
       .trim()
@@ -101,7 +101,7 @@ export interface ClassInfo {
   date: Date;
   absolute: string;
   links: null | Record<'Twitch' | 'YouTube', string>;
-  chapters?: null | SecondsMap;
+  markers?: null | SecondsMap;
   captions?: null | SecondsMap;
   chat?: null | ChatInfo;
   isOfficeHours: boolean;
@@ -111,7 +111,7 @@ const getMissingStrings = (classes: ClassInfo[]) => {
   function* getWhatsMissing(info: ClassInfo) {
     if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
     if (!info.links) yield 'links';
-    if (!fs.existsSync(path.join(info.absolute, 'chapters'))) yield 'chapters';
+    if (!fs.existsSync(path.join(info.absolute, 'markers'))) yield 'markers';
     if (!info.isOfficeHours) {
       if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
       if (info.links && !info.links.YouTube) yield 'YouTube link';
@@ -206,13 +206,13 @@ const chatToSecondsMap = (chatInfo: ChatInfo) => {
 const includesGenerator = (caseInsensitive: boolean) => (haystack: string, needle: string) =>
   caseInsensitive ? haystack.toLowerCase().includes(needle) : haystack.includes(needle);
 
-const matchesToAbbr = (matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>) => {
+const matchesToAbbr = (matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]>) => {
   const parts = [];
-  if (matches.chapters.length) parts.push('ch:' + matches.chapters.length);
+  if (matches.markers.length) parts.push('ch:' + matches.markers.length);
   if (matches.captions.length) parts.push('cap:' + matches.captions.length);
   if (matches.links.length) parts.push('lnk:' + matches.links.length);
   if (matches.chat.length) parts.push('ct:' + matches.chat.length);
-  if (matches.raw.length) parts.push('raw:' + matches.chapters.length);
+  if (matches.raw.length) parts.push('raw:' + matches.markers.length);
   return '(' + parts.join(', ') + ')';
 };
 
@@ -230,8 +230,8 @@ if (require.main === module)
           type: 'checkbox',
           name: 'haystackNames',
           message: 'Assets to search within',
-          choices: ['chapters', 'links', 'captions', 'chat'],
-          default: ['chapters', 'links'],
+          choices: ['markers', 'links', 'captions', 'chat'],
+          default: ['markers', 'links'],
         },
         {
           type: 'confirm',
@@ -250,7 +250,7 @@ if (require.main === module)
           query: string;
           haystackNames: string[];
         }) => {
-          const haystacks = haystackNames.reduce<Record<'chapters' | 'captions' | 'links' | 'chat', true>>(
+          const haystacks = haystackNames.reduce<Record<'markers' | 'captions' | 'links' | 'chat', true>>(
             (stack, name) => ({ ...stack, [name]: true }),
             {} as any,
           );
@@ -261,21 +261,21 @@ if (require.main === module)
           const classMatches = (
             await Promise.all(
               classes.map(async info => {
-                const matches: Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
-                  chapters: [],
+                const matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
+                  markers: [],
                   captions: [],
                   links: [],
                   chat: [],
                   raw: [],
                 };
                 if (includes(info.dirname, query)) matches.raw.push(info.dirname);
-                if (haystacks.chapters) {
-                  if (info.chapters === undefined)
-                    info.chapters = await parseChapters(path.join(info.absolute, 'chapters'));
-                  if (info.chapters)
-                    matches.chapters = secondsMapToLines(
+                if (haystacks.markers) {
+                  if (info.markers === undefined)
+                    info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
+                  if (info.markers)
+                    matches.markers = secondsMapToLines(
                       info,
-                      searchSecondsMapForNeedle(info.chapters, query, includes),
+                      searchSecondsMapForNeedle(info.markers, query, includes),
                     );
                 }
                 if (haystacks.captions) {
@@ -301,7 +301,7 @@ if (require.main === module)
                     .map(parts => parts.join(': '));
                 return [info, matches] as [
                   ClassInfo,
-                  Record<'chapters' | 'captions' | 'links' | 'chat' | 'raw', string[]>,
+                  Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]>,
                 ];
               }),
             )

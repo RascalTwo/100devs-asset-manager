@@ -34,9 +34,9 @@ export const parseMarkers = makeParser<SecondsMap>(absolute =>
         let hours = 0;
         let minutes = 0;
         let seconds = 0;
-        if (parts.length === 3) ([hours, minutes, seconds] = parts);
-        else if (parts.length === 2) ([minutes, seconds] = parts);
-        else if (parts.length === 1) ([seconds] = parts);
+        if (parts.length === 3) [hours, minutes, seconds] = parts;
+        else if (parts.length === 2) [minutes, seconds] = parts;
+        else if (parts.length === 1) [seconds] = parts;
 
         times.set(seconds + minutes * 60 + hours * 60 * 60, title);
         return times;
@@ -112,6 +112,7 @@ export interface ClassInfo {
   captions?: null | SecondsMap;
   chat?: null | ChatInfo;
   isOfficeHours: boolean;
+  number?: number;
 }
 
 const getMissingStrings = (classes: ClassInfo[]) => {
@@ -223,8 +224,20 @@ const matchesToAbbr = (matches: Record<'markers' | 'captions' | 'links' | 'chat'
   return '(' + parts.join(', ') + ')';
 };
 
+export function populateClassNumbers(classes: ClassInfo[]) {
+  let counts = { 0: 0, 1: 0 };
+  classes.forEach(info => {
+    info.number = ++counts[Number(info.isOfficeHours) as 0 | 1];
+  });
+  return classes;
+}
+
+export const classToSlug = (info: ClassInfo) =>
+  `${info.isOfficeHours ? 'O-' : 'C-'}${info.number?.toString().padStart(2, '0')} ${info.dirname}`;
+
 if (require.main === module)
   fetchClasses().then(classes => {
+    populateClassNumbers(classes);
     console.log(getMissingStrings(classes).join('\n'));
     return inquirer
       .prompt([
@@ -325,7 +338,7 @@ if (require.main === module)
                         name: 'chosen',
                         message: 'Class(es) to view matches of',
                         choices: classMatches.map(([info, matches], i) => ({
-                          name: `${info.dirname} - ${matchesToAbbr(matches)}`,
+                          name: `${classToSlug(info)} - ${matchesToAbbr(matches)}`,
                           value: i,
                         })),
                         loop: false,

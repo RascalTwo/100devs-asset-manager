@@ -1,12 +1,6 @@
 import inquirer from 'inquirer';
 import path from 'path';
-import {
-	ClassInfo,
-  fetchClasses,
-  parseMarkers,
-  SecondsMap,
-  secondsToDHMS,
-} from './search';
+import { ClassInfo, classToSlug, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
 
 function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
   return new Map(
@@ -35,6 +29,7 @@ function generateYoutubeComment(markers: SecondsMap): string {
 }
 
 fetchClasses().then(async classes => {
+  populateClassNumbers(classes);
   const chosenClasses = await inquirer
     .prompt([
       {
@@ -42,10 +37,10 @@ fetchClasses().then(async classes => {
         name: 'chosen',
         message: 'Class(es) to generate comments for',
         choices: classes
-					.map((info, i) => [info, i] as [ClassInfo, number])
+          .map((info, i) => [info, i] as [ClassInfo, number])
           .filter(([info]) => info.links?.YouTube)
           .map(([info, i]) => ({
-            name: info.dirname,
+            name: classToSlug(info),
             value: i,
           })),
         loop: false,

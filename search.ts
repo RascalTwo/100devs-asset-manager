@@ -30,7 +30,14 @@ export const parseMarkers = makeParser<SecondsMap>(absolute =>
       .split('\n')
       .map(line => line.split('\t'))
       .reduce((times, [time, title]) => {
-        const [hours, minutes, seconds] = time.split(':').map(Number);
+        const parts = time.split(':').map(Number);
+        let hours = 0;
+        let minutes = 0;
+        let seconds = 0;
+        if (parts.length === 3) ([hours, minutes, seconds] = parts);
+        else if (parts.length === 2) ([minutes, seconds] = parts);
+        else if (parts.length === 1) ([seconds] = parts);
+
         times.set(seconds + minutes * 60 + hours * 60 * 60, title);
         return times;
       }, new Map<number, string>()),

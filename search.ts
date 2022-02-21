@@ -113,6 +113,7 @@ export interface ClassInfo {
   chat?: null | ChatInfo;
   isOfficeHours: boolean;
   number?: number;
+  video?: string;
 }
 
 const getMissingStrings = (classes: ClassInfo[]) => {
@@ -123,7 +124,7 @@ const getMissingStrings = (classes: ClassInfo[]) => {
     if (!info.isOfficeHours) {
       if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
       if (info.links && !info.links.YouTube) yield 'YouTube link';
-    }
+    } else if (!info.video) yield 'Video';
     if (info.links && !info.links.Twitch) yield 'Twitch link';
   }
   return classes
@@ -142,6 +143,7 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
 
         const [year, month, dayOfMonth] = dirname.split('-').map(Number);
         const date = new Date(year, month - 1, dayOfMonth);
+        const videoFilename = (await fs.promises.readdir(absolute)).find(filename => filename.endsWith('.mp4'));
 
         return {
           dirname,
@@ -149,6 +151,7 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
           absolute,
           links: await parseLinks(path.join(absolute, 'links')),
           isOfficeHours: date.getDay() === 0,
+          video: videoFilename ? path.join(absolute, videoFilename) : undefined,
         };
       }),
   );

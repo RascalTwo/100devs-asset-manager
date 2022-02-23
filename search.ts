@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
+import chalk from 'chalk';
 
 const makeParser =
   <T>(parse: (absolute: string) => Promise<null | T>) =>
@@ -350,6 +351,7 @@ if (require.main === module)
                     .then(({ chosen }: { chosen: number[] }) => classMatches.filter((_, i) => chosen.includes(i)));
             if (!chosenClasses.length) break;
 
+            const replRegex = new RegExp(`(${query})`, 'ig');
             for (const [info, matches] of chosenClasses) {
               console.log(
                 `${info.dirname} with ${matchesToAbbr(matches)} matches:\n${
@@ -359,7 +361,7 @@ if (require.main === module)
               for (const [haystack, lines] of Object.entries(matches)) {
                 if (!lines.length) continue;
                 console.log('\t' + haystack.toUpperCase());
-                console.log(lines.join('\n'));
+                console.log(lines.join('\n').replace(replRegex, chalk.bgWhite.black('$1')));
               }
             }
 

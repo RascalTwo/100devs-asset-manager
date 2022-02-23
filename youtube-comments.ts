@@ -14,7 +14,7 @@ const COMMENT_PREFIX = `Here are timestamps for the slides, for whomever needs t
 
 `;
 
-function generateYoutubeComment(markers: SecondsMap): string {
+function generateYoutubeComment(markers: SecondsMap, offset: number): string {
   const entries = Array.from(filterMarkersForYouTube(markers)).reverse();
   if (!entries.length) return '';
 
@@ -23,15 +23,20 @@ function generateYoutubeComment(markers: SecondsMap): string {
     COMMENT_PREFIX +
     entries
       .reverse()
-      .map(([seconds, string]) => secondsToDHMS(seconds, places) + '\t' + string)
+      .map(([seconds, string]) => secondsToDHMS(seconds + offset, places) + '\t' + string)
       .join('\n')
   );
 }
 
 fetchClasses().then(async classes => {
   populateClassNumbers(classes);
-  const chosenClasses = await inquirer
-    .prompt([
+  const { offset, chosen }: { offset: number, chosen: number[] } = await inquirer.prompt([
+      {
+        type: 'number',
+        name: 'offset',
+        message: 'Twitch to YouTube start offset',
+        default: 0
+      },
       {
         type: 'checkbox',
         name: 'chosen',
@@ -46,7 +51,7 @@ fetchClasses().then(async classes => {
         loop: false,
       },
     ])
-    .then(({ chosen }: { chosen: number[] }) => classes.filter((_, i) => chosen.includes(i)));
+  const chosenClasses = classes.filter((_, i) => chosen.includes(i))
   await Promise.all(
     chosenClasses.map(async info => {
       info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
@@ -54,7 +59,7 @@ fetchClasses().then(async classes => {
   );
 
   chosenClasses
-    .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!)])
+    .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!, offset)])
     .filter(([_, comment]) => comment)
     .map(([url, comment]) => console.log('\t' + url + '\n' + comment + '\n\t' + url));
 });

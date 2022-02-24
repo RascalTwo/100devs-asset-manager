@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import { chooseClasses } from './shared';
 
 const makeParser =
   <T>(parse: (absolute: string) => Promise<null | T>) =>
@@ -155,7 +156,7 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
           video: videoFilename ? path.join(absolute, videoFilename) : undefined,
         };
       }),
-  );
+  ).then(populateClassNumbers);
 
 const searchSecondsMapForNeedle = (
   obj: SecondsMap,
@@ -241,7 +242,6 @@ export const classToSlug = (info: ClassInfo) =>
 
 if (require.main === module)
   fetchClasses().then(classes => {
-    populateClassNumbers(classes);
     console.log(getMissingStrings(classes).join('\n'));
     return inquirer
       .prompt([
@@ -332,23 +332,13 @@ if (require.main === module)
           if (!classMatches.length) return console.log('No matches found');
 
           while (true) {
-            const chosenClasses =
-              classMatches.length === 1
-                ? classMatches
-                : await inquirer
-                    .prompt([
-                      {
-                        type: 'checkbox',
-                        name: 'chosen',
-                        message: 'Class(es) to view matches of',
-                        choices: classMatches.map(([info, matches], i) => ({
-                          name: `${classToSlug(info)} - ${matchesToAbbr(matches)}`,
-                          value: i,
-                        })),
-                        loop: false,
-                      },
-                    ])
-                    .then(({ chosen }: { chosen: number[] }) => classMatches.filter((_, i) => chosen.includes(i)));
+            const chosenClasses = await chooseClasses<typeof classMatches[0]>(
+              classMatches.map(([info]) => info),
+              'Class(es) to view matches of',
+              (info, i) => [info, classMatches[i][1]],
+              (info, i) => `${classToSlug(info)} - ${matchesToAbbr(classMatches[i][1])}`,
+            );
+
             if (!chosenClasses.length) break;
 
             const replRegex = new RegExp(`(${query})`, 'ig');

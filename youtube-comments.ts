@@ -1,6 +1,7 @@
 import inquirer from 'inquirer';
 import path from 'path';
-import { ClassInfo, classToSlug, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
+import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
+import { chooseClasses } from './shared';
 
 function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
   return new Map(
@@ -29,29 +30,19 @@ function generateYoutubeComment(markers: SecondsMap, offset: number): string {
 }
 
 fetchClasses().then(async classes => {
-  populateClassNumbers(classes);
-  const { offset, chosen }: { offset: number, chosen: number[] } = await inquirer.prompt([
-      {
-        type: 'number',
-        name: 'offset',
-        message: 'Twitch to YouTube start offset',
-        default: 0
-      },
-      {
-        type: 'checkbox',
-        name: 'chosen',
-        message: 'Class(es) to generate comments for',
-        choices: classes
-          .map((info, i) => [info, i] as [ClassInfo, number])
-          .filter(([info]) => info.links?.YouTube)
-          .map(([info, i]) => ({
-            name: classToSlug(info),
-            value: i,
-          })),
-        loop: false,
-      },
-    ])
-  const chosenClasses = classes.filter((_, i) => chosen.includes(i))
+  const { offset } = await inquirer.prompt<{ offset: number }>([
+    {
+      type: 'number',
+      name: 'offset',
+      message: 'Twitch to YouTube start offset',
+      default: 0,
+    },
+  ]);
+  const chosenClasses = await chooseClasses<ClassInfo>(
+    classes.filter(info => info.links?.YouTube),
+    'Class(es) to generate comments for',
+    info => info,
+  );
   await Promise.all(
     chosenClasses.map(async info => {
       info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
@@ -61,5 +52,5 @@ fetchClasses().then(async classes => {
   chosenClasses
     .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!, offset)])
     .filter(([_, comment]) => comment)
-    .map(([url, comment]) => console.log('\t' + url + '\n' + comment + '\n\t' + url));
+    .forEach(([url, comment]) => console.log('\t' + url + '\n' + comment + '\n\t' + url));
 });

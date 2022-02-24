@@ -15,13 +15,19 @@ const readFileString = (path: string) => fs.promises.readFile(path).then(b => b.
 
 export type SecondsMap = Map<number, string>;
 
-const parseLinks = makeParser<Record<'Twitch' | 'YouTube', string>>(absolute =>
+const parseLinks = makeParser<Links>(absolute =>
   readFileString(absolute).then(text =>
     text
       .trim()
       .split('\n')
       .map(line => line.split(':').map(part => part.trim()))
-      .reduce((links, [key, ...value]) => ({ ...links, [key]: value.join(':') }), { Twitch: '', YouTube: '' }),
+      .reduce((links, [key, ...value]) => ({ ...links, [key]: value.join(':') }), {
+        Twitch: '',
+        YouTube: '',
+        Slides: '',
+        Tweet: '',
+        Discord: '',
+      }),
   ),
 );
 
@@ -105,11 +111,13 @@ interface ChatMessage {
   body: string;
 }
 
+type Links = Record<'Twitch' | 'YouTube' | 'Slides' | 'Tweet' | 'Discord', string>;
+
 export interface ClassInfo {
   dirname: string;
   date: Date;
   absolute: string;
-  links: null | Record<'Twitch' | 'YouTube', string>;
+  links: null | Links;
   markers?: null | SecondsMap;
   captions?: null | SecondsMap;
   chat?: null | ChatInfo;
@@ -125,9 +133,17 @@ const getMissingStrings = (classes: ClassInfo[]) => {
     if (!fs.existsSync(path.join(info.absolute, 'markers'))) yield 'markers';
     if (!info.isOfficeHours) {
       if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
-      if (info.links && !info.links.YouTube) yield 'YouTube link';
-    } else if (!info.video) yield 'Video';
-    if (info.links && !info.links.Twitch) yield 'Twitch link';
+      if (info.links) {
+        if (!info.links.YouTube) yield 'YouTube link';
+        if (!info.links.Tweet) yield 'Tweet link';
+        if (!info.links.Slides) yield 'Slides link';
+      }
+    }
+    if (!info.video) yield 'Video';
+    if (info.links) {
+      if (!info.links.Twitch) yield 'Twitch link';
+      if (!info.links.Discord) yield 'Discord link';
+    }
   }
   return classes
     .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])

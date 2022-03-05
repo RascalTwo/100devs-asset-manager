@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { chooseClasses } from './shared';
+import { chooseClasses, getMissingStrings } from './shared';
 
 const makeParser =
   <T>(parse: (absolute: string) => Promise<null | T>) =>
@@ -126,30 +126,6 @@ export interface ClassInfo {
   video?: string;
 }
 
-const getMissingStrings = (classes: ClassInfo[]) => {
-  function* getWhatsMissing(info: ClassInfo) {
-    if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
-    if (!info.links) yield 'links';
-    if (!fs.existsSync(path.join(info.absolute, 'markers'))) yield 'markers';
-    if (!info.isOfficeHours) {
-      if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
-      if (info.links) {
-        if (!info.links.YouTube) yield 'YouTube link';
-        if (!info.links.Tweet) yield 'Tweet link';
-        if (!info.links.Slides) yield 'Slides link';
-      }
-    }
-    if (!info.video) yield 'Video';
-    if (info.links) {
-      if (!info.links.Twitch) yield 'Twitch link';
-      if (!info.links.Discord) yield 'Discord link';
-    }
-  }
-  return classes
-    .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
-    .filter(([_, missing]) => missing.length)
-    .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`);
-};
 
 const fetchClasses = (): Promise<ClassInfo[]> =>
   Promise.all(

@@ -1,4 +1,5 @@
 import inquirer from 'inquirer';
+import fs from 'fs';
 import path from 'path';
 import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
 import { chooseClasses } from './shared';
@@ -49,8 +50,8 @@ fetchClasses().then(async classes => {
     }),
   );
 
-  chosenClasses
+  return Promise.all(chosenClasses
     .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!, offset)])
     .filter(([_, comment]) => comment)
-    .forEach(([url, comment]) => console.log('\t' + url + '\n' + comment + '\n\t' + url));
+    .map(([url, comment]) => fs.promises.appendFile('comments', '\t' + url + '\n' + comment + '\n\t' + url)));
 });

@@ -4,13 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node dist",
+    "search": "node dist/search.js",
+    "upsert": "node dist/upsert.js",
+    "youtube-comments": "node dist/youtube-comments.js",
     "build": "tsc"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "chalk": "4.1.2",
+    "dotenv": "^16.0.0",
     "inquirer": "^8.2.0",
     "typescript": "^4.5.5"
   },

@@ -50,6 +50,8 @@ fetchClasses().then(async classes => {
     }),
   );
 
+  if (fs.existsSync('comments')) await fs.promises.rm('comments');
+
   return Promise.all(chosenClasses
     .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!, offset)])
     .filter(([_, comment]) => comment)

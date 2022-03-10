@@ -230,7 +230,7 @@ export function populateClassNumbers(classes: ClassInfo[]) {
 }
 
 export const classToSlug = (info: ClassInfo) =>
-  `${info.isOfficeHours ? 'O-' : 'C-'}${info.number?.toString().padStart(2, '0')} ${info.dirname}`;
+  `${info.isOfficeHours ? 'OH' : 'CL'} #${info.number?.toString().padStart(2, '0')} ${info.dirname}`;
 
 if (require.main === module)
   fetchClasses().then(classes => {

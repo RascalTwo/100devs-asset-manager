@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { ClassInfo, classToSlug } from './search';
+import { ClassInfo, classToSlug, SecondsMap } from './search';
 
 export function chooseClass<T>(
   classes: ClassInfo[],
@@ -68,5 +68,9 @@ export const getMissingStrings = (classes: ClassInfo[]) => {
   return classes
     .map(info => [info, [...getWhatsMissing(info)]] as [ClassInfo, string[]])
     .filter(([_, missing]) => missing.length)
-    .map(([info, missing]) => `${info.dirname} is missing ${missing.join(', ')}`);
+    .map(([info, missing]) => `${classToSlug(info)} is missing ${missing.join(', ')}`);
 };
+
+export const offsetTimestamps = (map: SecondsMap, offset: number) => {
+  return new Map([...map.entries()].map(([seconds, string]) => [seconds + offset, string]));
+}

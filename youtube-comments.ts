@@ -2,7 +2,7 @@ import inquirer from 'inquirer';
 import fs from 'fs';
 import path from 'path';
 import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
-import { chooseClasses } from './shared';
+import { chooseClasses, offsetTimestamps } from './shared';
 
 function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
   return new Map(
@@ -16,7 +16,7 @@ const COMMENT_PREFIX = `Here are timestamps for the slides, for whomever needs t
 
 `;
 
-function generateYoutubeComment(markers: SecondsMap, offset: number): string {
+function generateYoutubeComment(markers: SecondsMap): string {
   const entries = Array.from(filterMarkersForYouTube(markers)).reverse();
   if (!entries.length) return '';
 
@@ -25,7 +25,7 @@ function generateYoutubeComment(markers: SecondsMap, offset: number): string {
     COMMENT_PREFIX +
     entries
       .reverse()
-      .map(([seconds, string]) => secondsToDHMS(seconds + offset, places) + '\t' + string)
+      .map(([seconds, string]) => secondsToDHMS(seconds, places) + '\t' + string)
       .join('\n')
   );
 }
@@ -53,7 +53,7 @@ fetchClasses().then(async classes => {
   if (fs.existsSync('comments')) await fs.promises.rm('comments');
 
   return Promise.all(chosenClasses
-    .map(info => [info.links?.YouTube!, generateYoutubeComment(info.markers!, offset)])
+    .map(info => [info.links?.YouTube!, generateYoutubeComment(offsetTimestamps(info.markers!, offset))])
     .filter(([_, comment]) => comment)
     .map(([url, comment]) => fs.promises.appendFile('comments', '\t' + url + '\n' + comment + '\n\t' + url)));
 });

@@ -69,9 +69,10 @@ function formatMarkers(info: ClassInfo, marker: string) {
   if (marker.startsWith('Raiding')) {
     return `=HYPERLINK("https://twitch.tv/${marker.split('Raiding ')[1]}", "${marker}")`;
   }
-  const slideMatch = marker.match(/^#(\d+)\s/);
-  if (slideMatch) {
-    return `=HYPERLINK("${info.links?.Slides}#/${slideMatch[1]}", "${marker}")`;
+
+  if (info.links?.Slides) {
+    const slideMatch = marker.match(/^#(\d+)\s/);
+    if (slideMatch) return `=HYPERLINK("${info.links?.Slides}#/${slideMatch[1]}", "${marker}")`;
   }
   return marker;
 }

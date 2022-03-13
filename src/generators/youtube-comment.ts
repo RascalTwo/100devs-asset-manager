@@ -2,12 +2,13 @@ import inquirer from 'inquirer';
 import fs from 'fs';
 import path from 'path';
 import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from '../search';
-import { chooseClasses, offsetTimestamps } from '../shared';
+import { chooseClass, chooseClasses, offsetTimestamps } from '../shared';
 
 function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
   return new Map(
     Array.from(markers.entries()).filter(
-      ([_, string]) => string.match(/^#\d+\s+/) || string.match(/^(timer|break) (started|ended)/i),
+      ([_, string]) =>
+        string === 'Question of the Day' || string.match(/^#\d+\s+/) || string.match(/ (started|ended) $/i),
     ),
   );
 }
@@ -39,21 +40,19 @@ fetchClasses().then(async classes => {
       default: 0,
     },
   ]);
-  const chosenClasses = await chooseClasses<ClassInfo>(
+  const info = await chooseClass<ClassInfo>(
     classes.filter(info => info.links?.YouTube),
-    'Class(es) to generate comments for',
+    'Class to generate comment for',
     info => info,
   );
-  await Promise.all(
-    chosenClasses.map(async info => {
-      info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
-    }),
+
+  if (fs.existsSync('youtube-comment')) await fs.promises.rm('youtube-comment');
+
+  const comment = generateYoutubeComment(
+    offsetTimestamps((await parseMarkers(path.join(info.absolute, 'markers')))!, offset),
   );
-
-  if (fs.existsSync('comments')) await fs.promises.rm('comments');
-
-  return Promise.all(chosenClasses
-    .map(info => [info.links?.YouTube!, generateYoutubeComment(offsetTimestamps(info.markers!, offset))])
-    .filter(([_, comment]) => comment)
-    .map(([url, comment]) => fs.promises.appendFile('comments', '\t' + url + '\n' + comment + '\n\t' + url)));
+  return fs.promises.appendFile(
+    'youtube-comment',
+    '\t' + info.links?.YouTube + '\n' + comment + '\n\t' + info.links?.YouTube,
+  );
 });

@@ -23,11 +23,13 @@ fetchClasses().then(async classes => {
         if (last !== null) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected current to end before starting another');
         }
-        last = marker.split('started')[0].trim();
+        last = lowMarker.split(' started')[0].trim();
       }
       if (lowMarker.endsWith(' ended')) {
         if (last === null) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected start before an end');
+        } else if (last !== lowMarker.split(' ended')[0].trim()) {
+          log(secondsToDHMS(seconds, places) + '\t' + 'Expected end to match start');
         }
         last = null;
       }

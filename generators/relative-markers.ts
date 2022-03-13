@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { parseMarkers, secondsToDHMS } from './search';
+import { parseMarkers, secondsToDHMS } from '../search';
 
 (async () => {
   const [source, destination] = process.argv.slice(2);

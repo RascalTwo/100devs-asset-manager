@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "search": "node dist/search.js",
-    "upsert": "node dist/upsert.js",
+    "create": "node dist/create.js",
+    "update": "node dist/update.js",
     "validate": "node dist/validate.js",
     "generate-youtube-comment": "node dist/generators/youtube-comment.js",
     "generate-discord-messages": "node dist/generators/discord-messages.js",

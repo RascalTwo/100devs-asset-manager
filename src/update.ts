@@ -9,36 +9,6 @@ import { chooseClass } from './shared';
 import { config } from 'dotenv';
 config();
 
-async function create(): Promise<void> {
-  const { date, twitchVod, discordLink }: { date: string; twitchVod: string; discordLink: string } =
-    await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'date',
-        message: 'Date of Stream',
-        validate: input => (input.match(/^\d{4}-\d{2}-\d{2}$/) ? true : 'Must be in YYYY-MM-DD format'),
-      },
-      {
-        type: 'input',
-        name: 'twitchVod',
-        message: 'Twitch VOD ID',
-        validate: input => (input.match(/\d{10}$/) ? true : 'Must at least end with a Twitch VOD ID'),
-      },
-      {
-        type: 'input',
-        name: 'discordLink',
-        message: 'Discord Message Link',
-      },
-    ]);
-  const twitchVodID = twitchVod.split('/').slice(-1)[0];
-  const absolute = path.join(__dirname, '../../', date);
-  await fs.promises.mkdir(absolute);
-  await fs.promises.writeFile(
-    path.join(absolute, 'links'),
-    `Twitch: https://www.twitch.tv/videos/${twitchVodID}\nDiscord: ${discordLink}`,
-  );
-}
-
 async function updateFile(filepath: string) {
   const content = fs.existsSync(filepath) ? (await fs.promises.readFile(filepath)).toString() : '';
   const { newContent } = await inquirer.prompt<{ newContent: string }>([
@@ -110,59 +80,38 @@ async function downloadChat(info: ClassInfo) {
   );
 }
 
-async function update() {
+(async () => {
   const info = await chooseClass(await fetchClasses(), 'Choose class to update', info => info);
   if (!info) return;
 
-  const choices = ['Links', 'Markers'];
-  if (info.links?.YouTube && !fs.existsSync(path.join(info.absolute, 'captions'))) choices.push('Download Captions');
-  if (info.isOfficeHours && !info.video) choices.push('Download Video');
-  if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) choices.push('Download Chat');
-
-  const { property } = await inquirer.prompt<{ property: string }>({
-    type: 'list',
-    name: 'property',
-    message: 'Property to Update',
-    choices: choices,
-  });
-  switch (property) {
-    case 'Links':
-    case 'Markers':
-      await updateFile(path.join(info.absolute, property.toLowerCase()));
-      break;
-    case 'Download Captions':
-      await downloadCaptions(info);
-      break;
-    case 'Download Video':
-      await downloadVideo(info);
-      break;
-    case 'Download Chat':
-      await downloadChat(info);
-      break;
-  }
-}
-
-async function menu(): Promise<void> {
   while (true) {
-    const { choice }: { choice: 'Create' | 'Update' | 'Exit' } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'choice',
-        message: 'Choose Action',
-        choices: ['Update', 'Create', 'Exit'],
-      },
-    ]);
-    switch (choice) {
-      case 'Create':
-        await create();
+    const choices = ['Links', 'Markers'];
+    if (info.links?.YouTube && !fs.existsSync(path.join(info.absolute, 'captions'))) choices.push('Download Captions');
+    if (info.isOfficeHours && !info.video) choices.push('Download Video');
+    if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) choices.push('Download Chat');
+
+    const { property } = await inquirer.prompt<{ property: string }>({
+      type: 'list',
+      name: 'property',
+      message: 'Property to Update',
+      choices: [...choices, 'Exit'],
+    });
+    switch (property) {
+      case 'Links':
+      case 'Markers':
+        await updateFile(path.join(info.absolute, property.toLowerCase()));
         break;
-      case 'Update':
-        await update();
+      case 'Download Captions':
+        await downloadCaptions(info);
+        break;
+      case 'Download Video':
+        await downloadVideo(info);
+        break;
+      case 'Download Chat':
+        await downloadChat(info);
         break;
       case 'Exit':
         return;
     }
   }
-}
-
-menu().catch(console.error);
+})();

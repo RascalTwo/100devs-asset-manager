@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { classToSlug, fetchClasses, parseMarkers, secondsToDHMS } from './search';
 import { getMissingStrings } from './shared';
@@ -12,14 +13,17 @@ fetchClasses().then(async classes => {
   console.log(getMissingStrings(classes).join('\n'));
 
   for (const info of classes) {
+    const markersPath = path.join(info.absolute, 'markers');
+    if (!fs.existsSync(markersPath)) continue;
+
+    const entries = Array.from((await parseMarkers(markersPath))?.entries()!);
+    const places = secondsToDHMS(entries[entries.length - 1][0]).split(':').length;
+
     let log = (message: string) => {
       console.log('\t' + classToSlug(info));
       log = console.log.bind(console);
       log(message);
     };
-
-    const entries = Array.from((await parseMarkers(path.join(info.absolute, 'markers')))?.entries()!);
-    const places = secondsToDHMS(entries[entries.length - 1][0]).split(':').length;
 
     let empty = false;
     let last = null;

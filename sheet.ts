@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
+import crypto from 'crypto';
 
-import { google } from 'googleapis';
+import { google, sheets_v4 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 
 import { ClassInfo, classToSlug, fetchClasses, generateTwitchTimestamp, parseMarkers, secondsToDHMS } from './search';
@@ -13,26 +14,24 @@ config();
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const TOKEN_PATH = 'token.json';
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
+const IGNORE_HASHES = process.argv[2] === 'force'
 
 // #region Node.js quickstart
 // https://developers.google.com/sheets/api/quickstart/nodejs
 
-fs.readFile('credentials.json', (err, content) => {
-  if (err) return console.log('Error loading client secret file:', err);
-  // Authorize a client with credentials, then call the Google Sheets API.
-  authorize(JSON.parse(content.toString()), main);
-});
-
-function authorize(credentials: any, callback: (oAuth2Client: OAuth2Client) => void) {
+function authorize(credentials: any) {
   const { client_secret, client_id, redirect_uris } = credentials.installed;
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
   // Check if we have previously stored a token.
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    if (err) return getNewToken(oAuth2Client, callback);
-    oAuth2Client.setCredentials(JSON.parse(token.toString()));
-    callback(oAuth2Client);
-  });
+  console.log('Reading Token...');
+  return fs.promises
+    .readFile(TOKEN_PATH)
+    .then(token => {
+      oAuth2Client.setCredentials(JSON.parse(token.toString()));
+      return oAuth2Client;
+    })
+    .catch(() => getNewToken(oAuth2Client));
 }
 
 /**
@@ -41,27 +40,30 @@ function authorize(credentials: any, callback: (oAuth2Client: OAuth2Client) => v
  * @param {google.auth.OAuth2} oAuth2Client The OAuth2 client to get token for.
  * @param {getEventsCallback} callback The callback for the authorized client.
  */
-function getNewToken(oAuth2Client: OAuth2Client, callback: (oAuth2Client: OAuth2Client) => void) {
+function getNewToken(oAuth2Client: OAuth2Client) {
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
   });
   console.log('Authorize this app by visiting this url:', authUrl);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  rl.question('Enter the code from that page here: ', code => {
-    rl.close();
-    oAuth2Client.getToken(code, (err, token) => {
-      if (err) return console.error('Error while trying to retrieve access token', err);
-      oAuth2Client.setCredentials(token!);
-      // Store the token to disk for later program executions
-      fs.writeFile(TOKEN_PATH, JSON.stringify(token), err => {
-        if (err) return console.error(err);
-        console.log('Token stored to', TOKEN_PATH);
+  return new Promise<OAuth2Client>((resolve, reject) => {
+    rl.question('Enter the code from that page here: ', code => {
+      rl.close();
+      oAuth2Client.getToken(code, (err, token) => {
+        if (err) return reject('Error while trying to retrieve access token: ' + err);
+        oAuth2Client.setCredentials(token!);
+        // Store the token to disk for later program executions
+        return fs.promises.writeFile(TOKEN_PATH, JSON.stringify(token)).then(() => resolve(oAuth2Client));
       });
-      callback(oAuth2Client);
     });
   });
 }
+
+fs.promises
+  .readFile('credentials.json')
+  .then(credentials => authorize(JSON.parse(credentials.toString())))
+  .then(main);
 
 // #endregion Node.js quickstart
 
@@ -77,7 +79,8 @@ function formatMarkers(info: ClassInfo, marker: string) {
   return marker;
 }
 
-async function* generateWorksheetData() {
+async function generateWorksheetData() {
+  const data = [];
   for (const info of await fetchClasses()) {
     const markersPath = path.join(info.absolute, 'markers');
     if (!fs.existsSync(markersPath)) continue;
@@ -87,7 +90,13 @@ async function* generateWorksheetData() {
     const rawOffset = info.links?.YouTube.split('t=')[1];
     const offset = rawOffset ? -rawOffset! : 0;
 
-    const rows = [];
+    const rows = [
+      [
+        info.links?.Twitch ? `=HYPERLINK("${info.links.Twitch}", "Twitch")` : 'Twitch',
+        info.links?.YouTube ? `=HYPERLINK("${info.links.YouTube}", "YouTube")` : 'YouTube',
+        '',
+      ],
+    ];
     const places = secondsToDHMS(Array.from(info.markers!.keys()).slice(-1)[0]).split(':').length;
 
     const twitchPrefix = `${info.links?.Twitch}?t=`;
@@ -102,56 +111,99 @@ async function* generateWorksheetData() {
       ];
       rows.push(row);
     }
-    yield {
+    data.push({
       title: classToSlug(info),
+      hash: crypto.createHash('md5').update(JSON.stringify(rows)).digest('hex'),
       info,
       rows,
-    };
+    });
   }
+  return data;
 }
 
 async function main(client: OAuth2Client) {
   const sheets = google.sheets({ version: 'v4', auth: client });
+  console.log('Fetching Spreadsheet...');
   const spreadsheet = (await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID })).data;
 
-  const templateWorksheet = spreadsheet.sheets?.find(worksheet => worksheet.properties?.title === 'Template')!;
+  const worksheetTitleMap = spreadsheet.sheets!.reduce<Record<string, sheets_v4.Schema$Sheet>>(
+    (map, worksheet) => ({ ...map, [worksheet.properties!.title!]: worksheet }),
+    {},
+  );
+  const templateWorksheetID = worksheetTitleMap.Template.properties!.sheetId!;
 
-  for await (const { info, title, rows } of generateWorksheetData()) {
-    console.log(title);
-    if (!spreadsheet.sheets?.find(worksheet => worksheet.properties?.title === title)) {
-      const response = await sheets.spreadsheets.sheets.copyTo({
-        sheetId: templateWorksheet.properties?.sheetId,
-        spreadsheetId: SPREADSHEET_ID,
-        requestBody: { destinationSpreadsheetId: SPREADSHEET_ID },
-      });
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        requestBody: {
-          requests: [
-            {
-              updateSheetProperties: {
-                properties: {
-                  sheetId: response.data.sheetId,
-                  title,
-                },
-                fields: 'title',
-              },
+  console.log('Generating Worksheets...');
+  const worksheetsData = await generateWorksheetData();
+
+  const missingWorksheetTitles = worksheetsData
+    .filter(({ title }) => !(title in worksheetTitleMap))
+    .map(({ title }) => title);
+  if (missingWorksheetTitles.length) {
+    console.log(`Creating ${missingWorksheetTitles.length} missing worksheets... `);
+    const bare = await Promise.all(
+      missingWorksheetTitles.map(title =>
+        sheets.spreadsheets.sheets
+          .copyTo({
+            sheetId: templateWorksheetID,
+            spreadsheetId: SPREADSHEET_ID,
+            requestBody: { destinationSpreadsheetId: SPREADSHEET_ID },
+          })
+          .then(({ data: { sheetId } }) => ({ sheetId, title })),
+      ),
+    );
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: bare.map(({ sheetId, title }) => ({
+          updateSheetProperties: {
+            properties: {
+              sheetId,
+              title,
             },
-          ],
-        },
-      });
-      if (info.isOfficeHours) {
-        await sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${title}!B2` });
-      }
-    }
+            fields: 'title',
+          },
+        })),
+      },
+    });
+  }
+  console.log(`Fetching ${worksheetsData.length} worksheet hashes...`);
+  const sheetHashes = (
+    await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: SPREADSHEET_ID,
+      ranges: worksheetsData.map(({ title }) => `${title}!Z1`),
+    })
+  ).data.valueRanges!.map(range => range.values?.[0][0] ?? null);
+  const changedWorksheets = IGNORE_HASHES ? worksheetsData : worksheetsData.filter(({ hash }, i) => hash !== sheetHashes[i]);
+  console.log(`${changedWorksheets.length} worksheets out of date`);
+
+  for (const { title, hash, rows } of changedWorksheets) {
+    console.log(title);
+
+    const { values } = (
+      await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${title}!A2:A`,
+      })
+    ).data;
+
+    const valueRowCount = values?.length || 1;
+    const paddedRows =
+      rows.length >= valueRowCount
+        ? rows
+        : [...rows, ...Array.from<string[]>({ length: valueRowCount - rows.length }).fill(['', '', ''])];
+
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
       requestBody: {
         valueInputOption: 'USER_ENTERED',
         data: [
           {
-            range: `${title}!A3:C${3 + rows.length}`,
-            values: rows,
+            range: `${title}!A2:C${2 + paddedRows.length}`,
+            values: paddedRows,
+          },
+          {
+            range: `${title}!Z1`,
+            values: [[hash]],
           },
         ],
       },

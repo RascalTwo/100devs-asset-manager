@@ -6,7 +6,11 @@
   "scripts": {
     "search": "node dist/search.js",
     "upsert": "node dist/upsert.js",
-    "youtube-comments": "node dist/youtube-comments.js",
+    "validate": "node dist/validate.js",
+    "generate-youtube-comment": "node dist/generators/youtube-comment.js",
+    "generate-discord-messages": "node dist/generators/discord-messages.js",
+    "relative-markers": "node dist/generators/relative-markers.js",
+    "view-similar-markers": "node dist/view-similar-markers.js",
     "build": "tsc"
   },
   "author": "",

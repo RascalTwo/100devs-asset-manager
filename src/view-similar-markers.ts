@@ -3,11 +3,6 @@ import path from 'path';
 import { classToSlug, fetchClasses, parseMarkers, secondsToDHMS } from './search';
 
 fetchClasses().then(async classes => {
-  await Promise.all(
-    classes.map(async info => {
-      info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
-    }),
-  );
   const { type } = await inquirer.prompt<{ type: 'Raid' | 'QOTD' }>([
     {
       type: 'list',
@@ -15,8 +10,14 @@ fetchClasses().then(async classes => {
       choices: ['Raid', 'QOTD'],
     },
   ]);
+  const actualClasses = type === 'QOTD' ? classes.filter(({ isOfficeHours }) => !isOfficeHours) : classes;
+  await Promise.all(
+    actualClasses.map(async info => {
+      info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
+    }),
+  );
   const keyword = type === 'Raid' ? 'raiding' : 'question of the day';
-  classes
+  actualClasses
     .filter(({ markers }) => markers)
     .map(info => {
       const raided = Array.from(info.markers!.entries()).find(([_, marker]) => marker.toLowerCase().includes(keyword));

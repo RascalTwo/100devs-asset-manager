@@ -5,7 +5,7 @@ import childProcess from 'child_process';
 import inquirer from 'inquirer';
 
 import { ClassInfo, fetchClasses } from './search';
-import { chooseClass, getMissingStrings } from './shared';
+import { chooseClass } from './shared';
 import { config } from 'dotenv';
 config();
 
@@ -143,7 +143,6 @@ async function update() {
 }
 
 async function menu(): Promise<void> {
-  console.log(getMissingStrings(await fetchClasses()).join('\n'));
   while (true) {
     const { choice }: { choice: 'Create' | 'Update' | 'Exit' } = await inquirer.prompt([
       {

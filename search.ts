@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { chooseClasses, getMissingStrings } from './shared';
+import { chooseClasses } from './shared';
 
 const makeParser =
   <T>(parse: (absolute: string) => Promise<null | T>) =>
@@ -234,7 +234,6 @@ export const classToSlug = (info: ClassInfo) =>
 
 if (require.main === module)
   fetchClasses().then(classes => {
-    console.log(getMissingStrings(classes).join('\n'));
     return inquirer
       .prompt([
         {

@@ -82,10 +82,22 @@ fetchClasses().then(async classes => {
     const chatPath = path.join(info.absolute, 'chat.json');
     if (!fs.existsSync(chatPath)) continue;
 
+    info.chat = await parseChat(chatPath)!;
+
+    const firstDate = info.chat!.messages[0].created_at;
+    if (
+      `${firstDate.getFullYear()}-${(firstDate.getMonth() + 1).toString().padStart(2, '0')}-${firstDate
+        .getDate()
+        .toString()
+        .padStart(2, '0')}` !== info.dirname
+    ) {
+      log(classToSlug(info) + ' chat has the wrong date ' + firstDate.toString());
+    }
+
     const lastMarker = Array.from(info.markers!.keys()).slice(-1)[0];
-    const lastChat = Array.from(chatToSecondsMap((await parseChat(chatPath))!).keys()).slice(-1)[0];
+    const lastChat = Array.from(chatToSecondsMap(info.chat!).keys()).slice(-1)[0];
     if (lastMarker < lastChat) continue;
 
-    log(classToSlug(info) + ` has a marker ${(lastChat - lastMarker).toFixed(2)} seconds after the last chat`);
+    log(classToSlug(info) + ` has a marker ${(lastMarker - lastChat).toFixed(2)} seconds after the last chat`);
   }
 });

@@ -1,8 +1,8 @@
 import inquirer from 'inquirer';
 import fs from 'fs';
 import path from 'path';
-import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from './search';
-import { chooseClasses, offsetTimestamps } from './shared';
+import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from '../search';
+import { chooseClasses, offsetTimestamps } from '../shared';
 
 function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
   return new Map(

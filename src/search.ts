@@ -199,7 +199,7 @@ const secondsMapToLines = (url: string, map: SecondsMap) => {
     .map(([seconds, haystack]) => `${prefix + generateTwitchTimestamp(seconds, places)}\t${haystack}`);
 };
 
-const chatToSecondsMap = (chatInfo: ChatInfo) => {
+export const chatToSecondsMap = (chatInfo: ChatInfo) => {
   const started = chatInfo.messages[0].created_at;
   return chatInfo.messages.reduce((map, message) => {
     const seconds = (message.created_at.getTime() - started.getTime()) / 1000;

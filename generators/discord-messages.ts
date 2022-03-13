@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { ClassInfo, fetchClasses, parseMarkers, SecondsMap, secondsToDHMS } from './search';
-import { chooseClass, } from './shared';
+import { ClassInfo, fetchClasses, parseMarkers, SecondsMap, secondsToDHMS } from '../search';
+import { chooseClass, } from '../shared';
 
 const MAX_MESSAGE_LENGTH = 1750;
 

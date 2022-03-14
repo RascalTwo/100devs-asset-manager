@@ -30,6 +30,10 @@ const getWordBefore = (string: string, ...args: Parameters<typeof String.prototy
     .slice(-1)[0];
 
 fetchClasses().then(async classes => {
+  const ignoring = ((process.argv[2] ?? '').split('--ignore=')[1] ?? '').split(',');
+  const IGNORE_SLIDES = ignoring.includes('slides');
+  const IGNORE_CHAT = ignoring.includes('chat');
+
   for (const info of classes) {
     let log = (message: string) => {
       console.log('\t' + classToSlug(info));
@@ -47,42 +51,56 @@ fetchClasses().then(async classes => {
     const entries = Array.from(info.markers?.entries()!);
     const places = secondsToDHMS(entries[entries.length - 1][0]).split(':').length;
     let empty = false;
-    let last = null;
+    let lastSlide = null;
+    let lastEvent = null;
     for (const [seconds, marker] of entries) {
       if (!marker) {
         empty = true;
         continue;
       }
 
+      if (!IGNORE_SLIDES && marker.match(/^#\d+\s/)) {
+        const number = +marker.split(' ')[0].slice(1);
+        if (lastSlide === null) lastSlide = number;
+        else {
+          if (number - lastSlide > 1) {
+            log(`Went from #${lastSlide} to #${number}`);
+          }
+          lastSlide = number;
+        }
+      }
+
       const lowMarker = marker.toLowerCase();
       if (lowMarker.endsWith(' started')) {
-        if (last !== null) {
+        if (lastEvent !== null) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected current to end before starting another');
         }
         if (!marker.endsWith(' Started')) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected Started to be capitalized');
         }
-        last = getWordBefore(marker, / started/i);
+        lastEvent = getWordBefore(marker, / started/i);
       }
       if (lowMarker.endsWith(' ended')) {
-        if (last === null) {
+        if (lastEvent === null) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected start before an end');
-        } else if (last !== getWordBefore(marker, / ended/i)) {
+        } else if (lastEvent !== getWordBefore(marker, / ended/i)) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected end to match start');
         }
         if (!marker.endsWith(' Ended')) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected Ended to be capitalized');
         }
-        last = null;
+        lastEvent = null;
       }
     }
-    if (last) log(`${last} never ended`);
+    if (lastEvent) log(`${lastEvent} never ended`);
     if (empty) log('Blank line within');
 
     const chatPath = path.join(info.absolute, 'chat.json');
     if (!fs.existsSync(chatPath)) continue;
 
     info.chat = await parseChat(chatPath)!;
+
+    if (IGNORE_CHAT) continue;
 
     const firstDate = info.chat!.messages[0].created_at;
     if (

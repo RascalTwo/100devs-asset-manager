@@ -1,5 +1,6 @@
 node_modules
 dist
+cache
 credentials.json
 token.json
 youtube-comment

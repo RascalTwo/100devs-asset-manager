@@ -9,6 +9,9 @@ import {
   parseMarkers,
   secondsToDHMS,
 } from './search';
+// @ts-ignore
+import fetch from 'node-fetch';
+import { JSDOM } from 'jsdom';
 
 function* getWhatsMissing(info: ClassInfo) {
   if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
@@ -29,6 +32,23 @@ const getWordBefore = (string: string, ...args: Parameters<typeof String.prototy
     .split(/\s+/)
     .slice(-1)[0];
 
+function parseSlidesHTML(html: string) {
+  return Array.from(new JSDOM(html).window.document.querySelectorAll('.slides > section[data-id]')).map(section =>
+    section.textContent?.trim().split(/\s+/).join(' '),
+  );
+}
+
+function getSlidesText(info: ClassInfo) {
+  const cachePath = path.join('cache', info.dirname + '.html');
+  if (fs.existsSync(cachePath))
+    return fs.promises.readFile(cachePath).then(buffer => parseSlidesHTML(buffer.toString()));
+  return fetch(info.links?.Slides)
+    .then((r: any) => r.text())
+    .then((html: string) => {
+      return fs.promises.writeFile(cachePath, html).then(() => parseSlidesHTML(html));
+    });
+}
+
 fetchClasses().then(async classes => {
   const ignoring = ((process.argv[2] ?? '').split('--ignore=')[1] ?? '').split(',');
   const IGNORE_SLIDES = ignoring.includes('slides');
@@ -47,6 +67,11 @@ fetchClasses().then(async classes => {
     const markersPath = path.join(info.absolute, 'markers');
     if (!fs.existsSync(markersPath)) continue;
 
+    let slidesText: string[] = [];
+    if (info.links?.Slides) {
+      slidesText = await getSlidesText(info);
+    }
+
     info.markers = await parseMarkers(markersPath);
     const entries = Array.from(info.markers?.entries()!);
     const places = secondsToDHMS(entries[entries.length - 1][0]).split(':').length;
@@ -61,12 +86,15 @@ fetchClasses().then(async classes => {
 
       if (!IGNORE_SLIDES && marker.match(/^#\d+\s/)) {
         const number = +marker.split(' ')[0].slice(1);
-        if (lastSlide === null) lastSlide = number;
-        else {
-          if (number - lastSlide > 1) {
-            log(`Went from #${lastSlide} to #${number}`);
-          }
-          lastSlide = number;
+        if (
+          info.links?.Slides &&
+          !slidesText[number].toLowerCase().includes(marker.split(' ').slice(1).join(' ').toLowerCase())
+        ) {
+          log(
+            `${secondsToDHMS(seconds, places)}\t${slidesText[number]} does not contain "${marker}": ${
+              info.links?.Slides
+            }#/${number}`,
+          );
         }
       }
 

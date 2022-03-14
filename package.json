@@ -12,6 +12,7 @@
     "generate-discord-messages": "node dist/generators/discord-messages.js",
     "relative-markers": "node dist/generators/relative-markers.js",
     "view-similar-markers": "node dist/view-similar-markers.js",
+    "update-sheet": "node dist/sheet.js",
     "build": "tsc"
   },
   "author": "",

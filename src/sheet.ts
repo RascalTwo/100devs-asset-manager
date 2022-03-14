@@ -140,21 +140,23 @@ async function main(client: OAuth2Client) {
     .map(({ title }) => title);
   if (missingWorksheetTitles.length) {
     console.log(`Creating ${missingWorksheetTitles.length} missing worksheets... `);
-    const bare = await Promise.all(
-      missingWorksheetTitles.map(title =>
-        sheets.spreadsheets.sheets
+    const updateProperties: sheets_v4.Schema$SheetProperties[] = [];
+    for (const title of missingWorksheetTitles) {
+      updateProperties.push(
+        await sheets.spreadsheets.sheets
           .copyTo({
             sheetId: templateWorksheetID,
             spreadsheetId: SPREADSHEET_ID,
             requestBody: { destinationSpreadsheetId: SPREADSHEET_ID },
           })
           .then(({ data: { sheetId } }) => ({ sheetId, title })),
-      ),
-    );
+      );
+    }
+
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
       requestBody: {
-        requests: bare.map(({ sheetId, title }) => ({
+        requests: updateProperties.map(({ sheetId, title }) => ({
           updateSheetProperties: {
             properties: {
               sheetId,

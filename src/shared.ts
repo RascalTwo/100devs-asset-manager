@@ -56,3 +56,12 @@ const performChoice = <T>(
 export const offsetTimestamps = (map: SecondsMap, offset: number) => {
   return new Map([...map.entries()].map(([seconds, string]) => [seconds + offset, string]));
 }
+
+export function filterMarkersForPublic(markers: SecondsMap): SecondsMap {
+  return new Map(
+    Array.from(markers.entries()).filter(
+      ([_, string]) =>
+        string.startsWith('Question of the Day') || string.match(/^#\d+\s+/) || string.match(/ (started|ended) $/i),
+    ),
+  );
+}

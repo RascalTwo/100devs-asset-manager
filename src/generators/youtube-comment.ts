@@ -2,23 +2,14 @@ import inquirer from 'inquirer';
 import fs from 'fs';
 import path from 'path';
 import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from '../search';
-import { chooseClass, chooseClasses, offsetTimestamps } from '../shared';
-
-function filterMarkersForYouTube(markers: SecondsMap): SecondsMap {
-  return new Map(
-    Array.from(markers.entries()).filter(
-      ([_, string]) =>
-        string === 'Question of the Day' || string.match(/^#\d+\s+/) || string.match(/ (started|ended) $/i),
-    ),
-  );
-}
+import { chooseClass, filterMarkersForPublic, offsetTimestamps } from '../shared';
 
 const COMMENT_PREFIX = `Here are timestamps for the slides, for whomever needs them:
 
 `;
 
 function generateYoutubeComment(markers: SecondsMap): string {
-  const entries = Array.from(filterMarkersForYouTube(markers)).reverse();
+  const entries = Array.from(filterMarkersForPublic(markers)).reverse();
   if (!entries.length) return '';
 
   const places = secondsToDHMS(entries[0][0]).split(':').length;

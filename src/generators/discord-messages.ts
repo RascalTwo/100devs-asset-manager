@@ -1,12 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { ClassInfo, fetchClasses, parseMarkers, SecondsMap, secondsToDHMS } from '../search';
-import { chooseClass, } from '../shared';
+import { chooseClass, filterMarkersForPublic, } from '../shared';
 
 const MAX_MESSAGE_LENGTH = 1750;
 
 function generateDiscordMessages(markers: SecondsMap): string[] {
-  const entries = Array.from(markers).reverse();
+  const entries = Array.from(filterMarkersForPublic(markers)).reverse();
   if (!entries.length) return [];
 
   const places = secondsToDHMS(entries[0][0]).split(':').length;

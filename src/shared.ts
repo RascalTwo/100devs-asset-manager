@@ -61,7 +61,7 @@ export function filterMarkersForPublic(markers: SecondsMap): SecondsMap {
   return new Map(
     Array.from(markers.entries()).filter(
       ([_, string]) =>
-        string.startsWith('Question of the Day') || string.match(/^#\d+\s+/) || string.match(/ (started|ended) $/i),
+        string.startsWith('Question of the Day') || string.match(/^#\d+\s+/) || string.match(/ (started|ended)$/i),
     ),
   );
 }

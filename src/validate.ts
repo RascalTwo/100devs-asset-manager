@@ -18,7 +18,7 @@ function* getWhatsMissing(info: ClassInfo) {
   if (!fs.existsSync(path.join(info.absolute, 'markers'))) yield 'markers';
   if (!info.isOfficeHours) {
     if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
-    if (!info.links?.YouTube) yield 'YouTube link';
+    if (!info.links?.YouTube) yield `YouTube link (${60 - Math.ceil((Date.now() - info.date.getTime()) / 86400000)} days remaining)`;
     if (!info.links?.Tweet) yield 'Tweet link';
     if (!info.links?.Slides) yield 'Slides link';
   } else if (!info.video) yield 'Video';
@@ -76,7 +76,6 @@ fetchClasses().then(async classes => {
     const entries = Array.from(info.markers?.entries()!);
     const places = secondsToDHMS(entries[entries.length - 1][0]).split(':').length;
     let empty = false;
-    let lastSlide = null;
     let lastEvent = null;
     for (const [seconds, marker] of entries) {
       if (!marker) {
@@ -101,7 +100,7 @@ fetchClasses().then(async classes => {
       const lowMarker = marker.toLowerCase();
       if (lowMarker.endsWith(' started')) {
         if (lastEvent !== null) {
-          log(secondsToDHMS(seconds, places) + '\t' + 'Expected current to end before starting another');
+          log(secondsToDHMS(seconds, places) + '\t' + `Expected ${lastEvent} to end before starting another`);
         }
         if (!marker.endsWith(' Started')) {
           log(secondsToDHMS(seconds, places) + '\t' + 'Expected Started to be capitalized');

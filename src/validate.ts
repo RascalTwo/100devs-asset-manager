@@ -9,9 +9,7 @@ import {
   parseMarkers,
   secondsToDHMS,
 } from './search';
-// @ts-ignore
-import fetch from 'node-fetch';
-import { JSDOM } from 'jsdom';
+import { getSlidesText } from './shared';
 
 function* getWhatsMissing(info: ClassInfo) {
   if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
@@ -32,22 +30,6 @@ const getWordBefore = (string: string, ...args: Parameters<typeof String.prototy
     .split(/\s+/)
     .slice(-1)[0];
 
-function parseSlidesHTML(html: string) {
-  return Array.from(new JSDOM(html).window.document.querySelectorAll('.slides > section[data-id]')).map(section =>
-    section.textContent?.trim().split(/\s+/).join(' '),
-  );
-}
-
-function getSlidesText(info: ClassInfo) {
-  const cachePath = path.join('cache', info.dirname + '.html');
-  if (fs.existsSync(cachePath))
-    return fs.promises.readFile(cachePath).then(buffer => parseSlidesHTML(buffer.toString()));
-  return fetch(info.links?.Slides)
-    .then((r: any) => r.text())
-    .then((html: string) => {
-      return fs.promises.writeFile(cachePath, html).then(() => parseSlidesHTML(html));
-    });
-}
 
 fetchClasses().then(async classes => {
   const ignoring = ((process.argv[2] ?? '').split('--ignore=')[1] ?? '').split(',');

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { chooseClasses } from './shared';
+import { chooseClasses, getSlidesText } from './shared';
 
 const makeParser =
   <T>(parse: (absolute: string) => Promise<null | T>) =>
@@ -124,6 +124,7 @@ export interface ClassInfo {
   isOfficeHours: boolean;
   number?: number;
   video?: string;
+  slides?: string[];
 }
 
 
@@ -211,13 +212,14 @@ export const chatToSecondsMap = (chatInfo: ChatInfo) => {
 const includesGenerator = (caseInsensitive: boolean) => (haystack: string, needle: string) =>
   caseInsensitive ? haystack.toLowerCase().includes(needle) : haystack.includes(needle);
 
-const matchesToAbbr = (matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]>) => {
+const matchesToAbbr = (matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw' | 'slides', string[]>) => {
   const parts = [];
   if (matches.markers.length) parts.push('ch:' + matches.markers.length);
   if (matches.captions.length) parts.push('cap:' + matches.captions.length);
   if (matches.links.length) parts.push('lnk:' + matches.links.length);
   if (matches.chat.length) parts.push('ct:' + matches.chat.length);
   if (matches.raw.length) parts.push('raw:' + matches.markers.length);
+  if (matches.slides.length) parts.push('sl:' + matches.slides.length);
   return '(' + parts.join(', ') + ')';
 };
 
@@ -245,7 +247,7 @@ if (require.main === module)
           type: 'checkbox',
           name: 'haystackNames',
           message: 'Assets to search within',
-          choices: ['markers', 'links', 'captions', 'chat'],
+          choices: ['markers', 'links', 'captions', 'chat', 'slides'],
           default: ['markers', 'links'],
         },
         {
@@ -265,7 +267,7 @@ if (require.main === module)
           query: string;
           haystackNames: string[];
         }) => {
-          const haystacks = haystackNames.reduce<Record<'markers' | 'captions' | 'links' | 'chat', true>>(
+          const haystacks = haystackNames.reduce<Record<'markers' | 'captions' | 'links' | 'chat' | 'slides', true>>(
             (stack, name) => ({ ...stack, [name]: true }),
             {} as any,
           );
@@ -278,12 +280,13 @@ if (require.main === module)
               classes.map(async info => {
                 const url = info.links!.Twitch || info.links!.YouTube;
 
-                const matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]> = {
+                const matches: Record<'markers' | 'captions' | 'links' | 'chat' | 'raw' | 'slides', string[]> = {
                   markers: [],
                   captions: [],
                   links: [],
                   chat: [],
                   raw: [],
+                  slides: [],
                 };
                 if (includes(info.dirname, query)) matches.raw.push(info.dirname);
                 if (haystacks.markers) {
@@ -313,9 +316,24 @@ if (require.main === module)
                   matches.links = Object.entries(info.links)
                     .filter(parts => parts.some(part => includes(part, query)))
                     .map(parts => parts.join(': '));
+                if (info.links?.Slides && haystacks.slides) {
+                  if (info.markers === undefined)
+                    info.markers = await parseMarkers(path.join(info.absolute, 'markers'));
+                  if (info.slides === undefined) info.slides = await getSlidesText(info);
+                  const places = info.slides!.length.toString().length;
+                  matches.slides = Object.entries(info.slides!)
+                    .map(([i, text]) => [i, text, `#${i.toString().padStart(places, '0')}`])
+                    .filter(([_, text, number]) => `${number}: ${text}`.toLowerCase().includes(query))
+                    .map(([_, text, number]) => {
+                      const foundMarker = [...(info.markers || new Map()).entries()].find(([_, marker]) => marker.startsWith(number));
+                      return foundMarker
+                        ? secondsMapToLines(url, new Map([foundMarker]))[0]
+                        : `${number}: ${text.slice(0, 50)}`;
+                    });
+                }
                 return [info, matches] as [
                   ClassInfo,
-                  Record<'markers' | 'captions' | 'links' | 'chat' | 'raw', string[]>,
+                  Record<'markers' | 'captions' | 'links' | 'chat' | 'raw' | 'slides', string[]>,
                 ];
               }),
             )

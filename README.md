@@ -113,6 +113,7 @@ Performs searching of almost _all_ assets:
 - `links`
 - `captions`
 - `chat.json`
+- Slides Text
 
 for keywords, showing the highlighted content along with a link to the video when the content appeared.
 

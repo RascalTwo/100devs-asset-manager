@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
 import { ClassInfo, classToSlug, SecondsMap } from './search';
+// @ts-ignore
+import fetch from 'node-fetch';
+import { JSDOM } from 'jsdom';
 
 export function chooseClass<T>(
   classes: ClassInfo[],
@@ -64,4 +67,22 @@ export function filterMarkersForPublic(markers: SecondsMap): SecondsMap {
         string.startsWith('Question of the Day') || string.match(/^#\d+\s+/) || string.match(/ (started|ended)$/i),
     ),
   );
+}
+
+
+function parseSlidesHTML(html: string) {
+  return Array.from(new JSDOM(html).window.document.querySelectorAll('.slides > section[data-id]')).map(section =>
+    section.textContent?.trim().split(/\s+/).join(' '),
+  );
+}
+
+export function getSlidesText(info: ClassInfo) {
+  const cachePath = path.join('cache', info.dirname + '.html');
+  if (fs.existsSync(cachePath))
+    return fs.promises.readFile(cachePath).then(buffer => parseSlidesHTML(buffer.toString()));
+  return fetch(info.links?.Slides)
+    .then((r: any) => r.text())
+    .then((html: string) => {
+      return fs.promises.writeFile(cachePath, html).then(() => parseSlidesHTML(html));
+    });
 }

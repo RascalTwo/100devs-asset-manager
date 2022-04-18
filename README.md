@@ -25,6 +25,8 @@ Assets are grouped into directories above the one the script is located in, name
 
 Not all of these files exist for each stream, and the streams are differentiated by the day of the week they're listed as - Office Hours are only on Sunday, all other days are Classes.
 
+> For Office Hours not on Sundays, they can be marked by creating a `is-office-hours` file to the directory
+
 #### Office Hours
 
 Office Hours do not contain a `captions` directory,

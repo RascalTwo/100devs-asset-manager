@@ -145,7 +145,7 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
           date,
           absolute,
           links: await parseLinks(path.join(absolute, 'links')),
-          isOfficeHours: date.getDay() === 0,
+          isOfficeHours: date.getDay() === 0 || fs.existsSync(path.join(absolute, 'is-office-hours')),
           video: videoFilename ? path.join(absolute, videoFilename) : undefined,
         };
       }),

@@ -160,10 +160,18 @@ Generates Discord messages of the chosen class `markers`, specifically surrounds
 
 Writes the comments to `discord-message.00` files.
 
-### `sheet`
+### `update-sheet`
 
 Generates and updates a Google Sheet with the linked timestamps, slide markers, and raiding channels.
 
 Requires a `credentials.json` [desktop credentials](https://developers.google.com/workspace/guides/create-credentials), and the `GOOGLE_SPREADSHEET_ID` set to the ID of the Google Spreadsheet.
 
 In addition, expects the template worksheet to be named `Template`, and will populate a 3xN area of cells ranging from `A3:CN`
+
+### `view-similar-markers`
+
+View all markers of the same type across classes
+
+### `diff-slide-markers`
+
+Generate textual differences between the slide markers and the slide text the marker is marking

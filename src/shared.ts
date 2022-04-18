@@ -65,7 +65,7 @@ export function filterMarkersForPublic(markers: SecondsMap): SecondsMap {
     Array.from(markers.entries()).filter(
       ([_, string]) =>
         string.startsWith('Question of the Day') || string.match(/^#\d+\s+/) || string.match(/ (started|ended)$/i),
-    ),
+    ).map(([_, string]) => [_, string.split('|')[0].trim()])
   );
 }
 
@@ -85,4 +85,11 @@ export function getSlidesText(info: ClassInfo) {
     .then((html: string) => {
       return fs.promises.writeFile(cachePath, html).then(() => parseSlidesHTML(html));
     });
+}
+
+export function parseSlideMarker(marker: string) {
+  if (!marker.match(/^#\d+\s/)) return null;
+
+  const [title, subtitle = ''] = marker.split(' ').slice(1).join(' ').split(' | ');
+  return { number: +marker.split(' ')[0].slice(1), title, subtitle };
 }

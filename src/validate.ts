@@ -9,7 +9,7 @@ import {
   parseMarkers,
   secondsToDHMS,
 } from './search';
-import { getSlidesText } from './shared';
+import { getSlidesText, parseSlideMarker } from './shared';
 
 function* getWhatsMissing(info: ClassInfo) {
   if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) yield 'chat.json';
@@ -36,7 +36,9 @@ fetchClasses().then(async classes => {
   const IGNORE_SLIDES = ignoring.includes('slides');
   const IGNORE_CHAT = ignoring.includes('chat');
 
-  for (const info of classes) {
+  const CLASS_INDEX = +process.argv.at(-1)!
+
+  for (const info of !isNaN(CLASS_INDEX) ? [classes.at(CLASS_INDEX)!] : classes) {
     let log = (message: string) => {
       console.log('\t' + classToSlug(info));
       log = console.log.bind(console);
@@ -65,17 +67,18 @@ fetchClasses().then(async classes => {
         continue;
       }
 
-      if (!IGNORE_SLIDES && marker.match(/^#\d+\s/)) {
-        const number = +marker.split(' ')[0].slice(1);
-        if (
-          info.links?.Slides &&
-          !slidesText[number].toLowerCase().includes(marker.split(' ').slice(1).join(' ').toLowerCase())
-        ) {
-          log(
-            `${secondsToDHMS(seconds, places)}\t${slidesText[number]} does not contain "${marker}": ${
-              info.links?.Slides
-            }#/${number}`,
-          );
+      if (!IGNORE_SLIDES && info.links?.Slides) {
+        const slideMarker = parseSlideMarker(marker);
+        if (slideMarker) {
+          const { number, title } = slideMarker;
+          const slideText = slidesText[number].toLowerCase();
+          if (!slideText.includes(title.toLowerCase())) {
+            log(
+              `${secondsToDHMS(seconds, places)}\t${slidesText[number]} does not contain "${title}": ${
+                info.links?.Slides
+              }#/${number}`,
+            );
+          }
         }
       }
 

@@ -70,7 +70,7 @@ async function downloadVideo(info: ClassInfo) {
 async function downloadChat(info: ClassInfo) {
   const vodID = info.links?.Twitch.split('/').slice(-1)[0]!;
   childProcess.execSync(
-    `python3.8 ${process.env.CHAT_DOWNLOAD_SCRIPT}/download.py ${vodID} ${process.env.TWITCH_CLIENT_ID}`,
+    `python3.8 ${process.env.CHAT_DOWNLOAD_SCRIPT}/download.py ${process.env.TWITCH_CLIENT_ID} ${vodID}`,
     { stdio: 'inherit' },
   );
 

@@ -87,7 +87,12 @@ async function downloadChat(info: ClassInfo) {
   while (true) {
     const choices = ['Links', 'Markers'];
     if (info.links?.YouTube && !fs.existsSync(path.join(info.absolute, 'captions'))) choices.push('Download Captions');
-    if (info.isOfficeHours && !info.video) choices.push('Download Video');
+    if (
+      !info.video &&
+      (info.isOfficeHours ||
+        (!info.links?.YouTube && 60 - Math.ceil((Date.now() - info.date.getTime()) / 86400000) < 7))
+    )
+      choices.push('Download Video');
     if (!fs.existsSync(path.join(info.absolute, 'chat.json'))) choices.push('Download Chat');
 
     const { property } = await inquirer.prompt<{ property: string }>({

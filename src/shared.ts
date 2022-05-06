@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { ClassInfo, classToSlug, SecondsMap } from './search';
+import { ClassInfo, classToSlug, SecondsMap, secondsToDHMS } from './search';
 // @ts-ignore
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
@@ -92,4 +92,23 @@ export function parseSlideMarker(marker: string) {
 
   const [title, subtitle = ''] = marker.split(' ').slice(1).join(' ').split(' | ');
   return { number: +marker.split(' ')[0].slice(1), title, subtitle };
+}
+
+
+const COMMENT_PREFIX = `Here are timestamps for the slides, for whomever needs them:
+
+`;
+
+export function generateYoutubeComment(markers: SecondsMap): string {
+  const entries = Array.from(filterMarkersForPublic(markers)).reverse();
+  if (!entries.length) return '';
+
+  const places = secondsToDHMS(entries[0][0]).split(':').length;
+  return (
+    COMMENT_PREFIX +
+    entries
+      .reverse()
+      .map(([seconds, string]) => secondsToDHMS(seconds, places) + '\t' + string)
+      .join('\n')
+  );
 }

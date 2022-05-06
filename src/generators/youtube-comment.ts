@@ -1,26 +1,8 @@
 import inquirer from 'inquirer';
 import fs from 'fs';
 import path from 'path';
-import { ClassInfo, fetchClasses, parseMarkers, populateClassNumbers, SecondsMap, secondsToDHMS } from '../search';
-import { chooseClass, filterMarkersForPublic, offsetTimestamps } from '../shared';
-
-const COMMENT_PREFIX = `Here are timestamps for the slides, for whomever needs them:
-
-`;
-
-function generateYoutubeComment(markers: SecondsMap): string {
-  const entries = Array.from(filterMarkersForPublic(markers)).reverse();
-  if (!entries.length) return '';
-
-  const places = secondsToDHMS(entries[0][0]).split(':').length;
-  return (
-    COMMENT_PREFIX +
-    entries
-      .reverse()
-      .map(([seconds, string]) => secondsToDHMS(seconds, places) + '\t' + string)
-      .join('\n')
-  );
-}
+import { ClassInfo, fetchClasses, parseMarkers } from '../search';
+import { chooseClass, generateYoutubeComment, offsetTimestamps } from '../shared';
 
 fetchClasses().then(async classes => {
   const { offset } = await inquirer.prompt<{ offset: number }>([

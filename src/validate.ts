@@ -17,6 +17,7 @@ function* getWhatsMissing(info: ClassInfo) {
   if (!info.isOfficeHours) {
     if (!fs.existsSync(path.join(info.absolute, 'captions'))) yield 'captions';
     if (!info.links?.YouTube) yield `YouTube link (${60 - Math.ceil((Date.now() - info.date.getTime()) / 86400000)} days remaining)`;
+    if (info.links.YouTube && !info.links['YouTube Comment']) yield 'YouTube comment'
     if (!info.links?.Tweet) yield 'Tweet link';
     if (!info.links?.Slides) yield 'Slides link';
   } else if (!info.video) yield 'Video';

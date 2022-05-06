@@ -24,6 +24,7 @@ const parseLinks = makeParser<Links>(absolute =>
       .reduce((links, [key, ...value]) => ({ ...links, [key]: value.join(':') }), {
         Twitch: '',
         YouTube: '',
+        'YouTube Comment': '',
         Slides: '',
         Tweet: '',
         Discord: '',
@@ -111,13 +112,13 @@ interface ChatMessage {
   body: string;
 }
 
-type Links = Record<'Twitch' | 'YouTube' | 'Slides' | 'Tweet' | 'Discord', string>;
+type Links = Record<'Twitch' | 'YouTube' | 'YouTube Comment' | 'Slides' | 'Tweet' | 'Discord', string>;
 
 export interface ClassInfo {
   dirname: string;
   date: Date;
   absolute: string;
-  links: null | Links;
+  links: Links;
   markers?: null | SecondsMap;
   captions?: null | SecondsMap;
   chat?: null | ChatInfo;
@@ -140,11 +141,13 @@ const fetchClasses = (): Promise<ClassInfo[]> =>
         const date = new Date(year, month - 1, dayOfMonth);
         const videoFilename = (await fs.promises.readdir(absolute)).find(filename => filename.endsWith('.mp4'));
 
+        const links = await parseLinks(path.join(absolute, 'links'))
+
         return {
           dirname,
           date,
           absolute,
-          links: await parseLinks(path.join(absolute, 'links')),
+          links: links!,
           isOfficeHours: date.getDay() === 0 || fs.existsSync(path.join(absolute, 'is-office-hours')),
           video: videoFilename ? path.join(absolute, videoFilename) : undefined,
         };

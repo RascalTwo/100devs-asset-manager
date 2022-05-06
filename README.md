@@ -66,11 +66,11 @@ is used to download the video.
 
 At minimum every stream contains a `Twitch` and `Discord` URL.
 
-Classes can additionally have `Tweet`, `Slides`, and `YouTube`.
+Classes can additionally have `Tweet`, `Slides`, `YouTube`, and `YouTube Comment`.
 
 In the rare occasion that a link would usually be expected for the stream yet is not available, leaving it blank is an option.
 
-> YouTube links support the `?t=` parameter to include the offset between the start of the Twitch VOD and the start of the YouTube video.
+> YouTube links support the `&t=` parameter to include the offset between the start of the Twitch VOD and the start of the YouTube video.
 
 ### `markers`
 
@@ -167,6 +167,12 @@ Generates and updates a Google Sheet with the linked timestamps, slide markers, 
 Requires a `credentials.json` [desktop credentials](https://developers.google.com/workspace/guides/create-credentials), and the `GOOGLE_SPREADSHEET_ID` set to the ID of the Google Spreadsheet.
 
 In addition, expects the template worksheet to be named `Template`, and will populate a 3xN area of cells ranging from `A3:CN`
+
+### `update-youtube-comments`
+
+Updates manually-generated YouTube comments with the current text they should contain.
+
+Requires a `credentials.json` [desktop credentials](https://developers.google.com/workspace/guides/create-credentials), along with `YOUTUBE_EMAIL` and `YOUTUBE_PASSWORD` of the account that created the comments.
 
 ### `view-similar-markers`
 

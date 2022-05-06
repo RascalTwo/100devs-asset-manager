@@ -2,6 +2,9 @@ node_modules
 dist
 cache
 credentials.json
-token.json
+*token.json
 youtube-comment
 discord-message.0*
+
+youtube-comment-hashes.json
+youtube-cookies.json

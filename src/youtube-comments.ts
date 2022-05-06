@@ -1,69 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import readline from 'readline';
 import crypto from 'crypto';
 
 import { google } from 'googleapis';
-import { firefox } from 'playwright';
-import { OAuth2Client } from 'google-auth-library';
+import { firefox, Page } from 'playwright';
 
 import { config } from 'dotenv';
 import { ClassInfo, fetchClasses, parseMarkers } from './search';
 import { generateYoutubeComment, offsetTimestamps } from './shared';
+import { authorize } from './google-auth';
 config();
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/youtube.force-ssl',
-  'https://www.googleapis.com/auth/youtube',
-  'https://www.googleapis.com/auth/youtube.readonly',
-];
-const TOKEN_PATH = 'youtube-token.json';
-
-// #region Node.js quickstart
-// https://developers.google.com/sheets/api/quickstart/nodejs
-
-function authorize(credentials: any) {
-  const { client_secret, client_id, redirect_uris } = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-
-  // Check if we have previously stored a token.
-  console.log('Reading Token...');
-  return fs.promises
-    .readFile(TOKEN_PATH)
-    .then(token => {
-      oAuth2Client.setCredentials(JSON.parse(token.toString()));
-      return oAuth2Client;
-    })
-    .catch(() => getNewToken(oAuth2Client));
-}
-
-/**
- * Get and store new token after prompting for user authorization, and then
- * execute the given callback with the authorized OAuth2 client.
- * @param {google.auth.OAuth2} oAuth2Client The OAuth2 client to get token for.
- * @param {getEventsCallback} callback The callback for the authorized client.
- */
-function getNewToken(oAuth2Client: OAuth2Client) {
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-  });
-  console.log('Authorize this app by visiting this url:', authUrl);
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise<OAuth2Client>((resolve, reject) => {
-    rl.question('Enter the code from that page here: ', code => {
-      rl.close();
-      oAuth2Client.getToken(code, (err, token) => {
-        if (err) return reject('Error while trying to retrieve access token: ' + err);
-        oAuth2Client.setCredentials(token!);
-        // Store the token to disk for later program executions
-        return fs.promises.writeFile(TOKEN_PATH, JSON.stringify(token)).then(() => resolve(oAuth2Client));
-      });
-    });
-  });
-}
-
-// #endregion Node.js quickstart
 
 const EMAIL = process.env.YOUTUBE_EMAIL;
 const PASSWORD = process.env.YOUTUBE_PASSWORD;
@@ -117,32 +63,52 @@ async function getUpdatingComments(hashes: CommentHashes) {
   if (fs.existsSync('youtube-comment-hashes.json'))
     await context.addCookies(JSON.parse((await fs.promises.readFile('youtube-cookies.json')).toString()));
 
-  const page = await context.newPage();
-
-  await page.goto('https://www.youtube.com/', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(5000);
-  if (await page.$('#buttons > ytd-button-renderer')) {
-    await page.locator('#buttons > ytd-button-renderer').click();
-    await page.waitForTimeout(2000);
-    await page.locator('#identifierId').fill(EMAIL);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
-    await page.locator('input[type="password"]').fill(PASSWORD);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
-  }
-
-  await fs.promises.writeFile('youtube-cookies.json', JSON.stringify(await context.cookies()));
-
   const client = await fs.promises
     .readFile('credentials.json')
-    .then(credentials => authorize(JSON.parse(credentials.toString())));
+    .then(credentials =>
+      authorize(JSON.parse(credentials.toString()), 'youtube', [
+        'https://www.googleapis.com/auth/youtube.force-ssl',
+        'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/youtube.readonly',
+      ]),
+    );
 
   const youtube = google.youtube('v3');
+
+  const getPage = (() => {
+    let page: Page | null = null;
+    return async () => {
+      if (page) return page;
+
+      console.log('Opening Browser...');
+      page = await context.newPage();
+
+      await page.goto('https://www.youtube.com/', { waitUntil: 'networkidle' });
+      await page.waitForTimeout(5000);
+      if (await page.$('#buttons > ytd-button-renderer')) {
+        console.log('Logging in...');
+        await page.locator('#buttons > ytd-button-renderer').click();
+        await page.waitForTimeout(2000);
+        await page.locator('#identifierId').fill(EMAIL);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+        await page.locator('input[type="password"]').fill(PASSWORD);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(2000);
+      } else {
+        console.log('Resuming previous login session...');
+      }
+
+      await fs.promises.writeFile('youtube-cookies.json', JSON.stringify(await context.cookies()));
+
+      return page;
+    };
+  })();
 
   for (let i = 0; i < updating.length; i++) {
     const { hash, text, info, justVerify } = updating[i];
     if (justVerify) continue;
+    const page = await getPage();
 
     console.log('Setting', info.dirname);
     const CID = info.links['YouTube Comment'];

@@ -9,63 +9,18 @@ import { OAuth2Client } from 'google-auth-library';
 import { ClassInfo, classToSlug, fetchClasses, generateTwitchTimestamp, parseMarkers, secondsToDHMS } from './search';
 
 import { config } from 'dotenv';
+import { authorize } from './google-auth';
 config();
 
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
-const TOKEN_PATH = 'token.json';
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
-const IGNORE_HASHES = process.argv[2] === 'force'
-
-// #region Node.js quickstart
-// https://developers.google.com/sheets/api/quickstart/nodejs
-
-function authorize(credentials: any) {
-  const { client_secret, client_id, redirect_uris } = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-
-  // Check if we have previously stored a token.
-  console.log('Reading Token...');
-  return fs.promises
-    .readFile(TOKEN_PATH)
-    .then(token => {
-      oAuth2Client.setCredentials(JSON.parse(token.toString()));
-      return oAuth2Client;
-    })
-    .catch(() => getNewToken(oAuth2Client));
-}
-
-/**
- * Get and store new token after prompting for user authorization, and then
- * execute the given callback with the authorized OAuth2 client.
- * @param {google.auth.OAuth2} oAuth2Client The OAuth2 client to get token for.
- * @param {getEventsCallback} callback The callback for the authorized client.
- */
-function getNewToken(oAuth2Client: OAuth2Client) {
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-  });
-  console.log('Authorize this app by visiting this url:', authUrl);
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise<OAuth2Client>((resolve, reject) => {
-    rl.question('Enter the code from that page here: ', code => {
-      rl.close();
-      oAuth2Client.getToken(code, (err, token) => {
-        if (err) return reject('Error while trying to retrieve access token: ' + err);
-        oAuth2Client.setCredentials(token!);
-        // Store the token to disk for later program executions
-        return fs.promises.writeFile(TOKEN_PATH, JSON.stringify(token)).then(() => resolve(oAuth2Client));
-      });
-    });
-  });
-}
+const IGNORE_HASHES = process.argv[2] === 'force';
 
 fs.promises
   .readFile('credentials.json')
-  .then(credentials => authorize(JSON.parse(credentials.toString())))
+  .then(credentials =>
+    authorize(JSON.parse(credentials.toString()), 'sheet', ['https://www.googleapis.com/auth/spreadsheets']),
+  )
   .then(main);
-
-// #endregion Node.js quickstart
 
 function formatMarkers(info: ClassInfo, marker: string) {
   if (marker.startsWith('Raiding')) {
@@ -175,7 +130,9 @@ async function main(client: OAuth2Client) {
       ranges: worksheetsData.map(({ title }) => `${title}!Z1`),
     })
   ).data.valueRanges!.map(range => range.values?.[0][0] ?? null);
-  const changedWorksheets = IGNORE_HASHES ? worksheetsData : worksheetsData.filter(({ hash }, i) => hash !== sheetHashes[i]);
+  const changedWorksheets = IGNORE_HASHES
+    ? worksheetsData
+    : worksheetsData.filter(({ hash }, i) => hash !== sheetHashes[i]);
   console.log(`${changedWorksheets.length} worksheets out of date`);
 
   for (const { title, hash, rows } of changedWorksheets) {
